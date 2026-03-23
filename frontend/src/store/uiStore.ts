@@ -1,29 +1,29 @@
-'use client'
-
 import { create } from 'zustand'
 
-type Toast = { id: string; message: string; type: 'success' | 'error' | 'info' }
+type Toast = { id: string; message: string; type: 'success' | 'error' | 'info' | 'warning' }
 
-type UIState = {
+type UIStore = {
   sidebarOpen: boolean
-  toasts: Toast[]
+  mobileSidebarOpen: boolean
   toggleSidebar: () => void
-  setSidebarOpen: (value: boolean) => void
+  openMobileSidebar: () => void
+  closeMobileSidebar: () => void
+  toasts: Toast[]
   addToast: (message: string, type?: Toast['type']) => void
   removeToast: (id: string) => void
 }
 
-export const useUIStore = create<UIState>((set) => ({
+export const useUIStore = create<UIStore>((set) => ({
   sidebarOpen: true,
-  toasts: [],
+  mobileSidebarOpen: false,
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
-  setSidebarOpen: (value) => set({ sidebarOpen: value }),
+  openMobileSidebar: () => set({ mobileSidebarOpen: true }),
+  closeMobileSidebar: () => set({ mobileSidebarOpen: false }),
+  toasts: [],
   addToast: (message, type = 'info') => {
     const id = Math.random().toString(36).slice(2)
     set((s) => ({ toasts: [...s.toasts, { id, message, type }] }))
-    setTimeout(() => {
-      set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }))
-    }, 3500)
+    setTimeout(() => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })), 3500)
   },
   removeToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 }))
