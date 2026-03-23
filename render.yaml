@@ -4,6 +4,7 @@ services:
     runtime: docker
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
+    plan: free
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -25,7 +26,11 @@ services:
         value: ./uploads
       - key: MAX_UPLOAD_SIZE_MB
         value: "50"
+      - key: ALLOWED_ORIGINS
+        value: http://localhost:3000
 
 databases:
   - name: mpt-db
     plan: free
+    databaseName: mpt_db
+    user: mpt_user
