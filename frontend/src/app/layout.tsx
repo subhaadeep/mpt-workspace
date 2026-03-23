@@ -4,10 +4,14 @@ import { Providers } from './providers'
 
 export const metadata: Metadata = {
   title: 'MPT Workspace',
-  description: 'Modular Platform for Trading & Content Management',
+  description: 'Modular Platform for Trading & Content',
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
     <html lang="en">
       <body>
