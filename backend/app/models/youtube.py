@@ -5,9 +5,10 @@ import enum
 
 
 class VideoStatus(str, enum.Enum):
-    planned = "planned"
-    scripted = "scripted"
-    edited = "edited"
+    script = "script"
+    raw_files = "raw_files"
+    editing = "editing"
+    thumbnail = "thumbnail"
     uploaded = "uploaded"
 
 
@@ -18,7 +19,7 @@ class YouTubeVideo(Base):
     title = Column(String(300), nullable=False)
     idea_description = Column(Text, nullable=True)
     script = Column(Text, nullable=True)
-    status = Column(Enum(VideoStatus), default=VideoStatus.planned)
+    status = Column(Enum(VideoStatus), default=VideoStatus.script)
     youtube_url = Column(String(500), nullable=True)
     tags = Column(String(500), nullable=True)
     scheduled_date = Column(DateTime(timezone=True), nullable=True)

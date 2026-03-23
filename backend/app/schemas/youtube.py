@@ -8,7 +8,7 @@ class VideoCreate(BaseModel):
     title: str
     idea_description: Optional[str] = None
     script: Optional[str] = None
-    status: VideoStatus = VideoStatus.planned
+    status: VideoStatus = VideoStatus.script
     tags: Optional[str] = None
     scheduled_date: Optional[datetime] = None
     youtube_url: Optional[str] = None
