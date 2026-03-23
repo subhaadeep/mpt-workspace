@@ -6,22 +6,21 @@ from app.core.config import settings
 
 
 def init_db():
-    """Create default admin user if none exists."""
     db: Session = SessionLocal()
     try:
-        admin = db.query(User).filter(User.is_admin == True).first()
-        if not admin:
-            admin_user = User(
+        existing = db.query(User).filter(User.email == settings.FIRST_ADMIN_EMAIL).first()
+        if not existing:
+            admin = User(
                 email=settings.FIRST_ADMIN_EMAIL,
                 hashed_password=get_password_hash(settings.FIRST_ADMIN_PASSWORD),
                 full_name="Admin",
-                is_admin=True,
+                role="admin",
                 is_active=True,
-                can_access_bots=True,
-                can_access_youtube=True,
             )
-            db.add(admin_user)
+            db.add(admin)
             db.commit()
-            print(f"[INIT] Admin user created: {settings.FIRST_ADMIN_EMAIL}")
+            print(f"[init_db] Created default admin: {settings.FIRST_ADMIN_EMAIL}")
+        else:
+            print("[init_db] Admin already exists, skipping.")
     finally:
         db.close()
