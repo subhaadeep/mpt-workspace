@@ -1,39 +1,38 @@
 'use client'
+
 import { useUIStore } from '@/store/uiStore'
 import { X, CheckCircle, AlertCircle, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-const iconMap = {
-  default: <Info className="w-4 h-4" />,
-  success: <CheckCircle className="w-4 h-4 text-green-500" />,
-  destructive: <AlertCircle className="w-4 h-4 text-red-500" />,
+const icons = {
+  success: <CheckCircle className="h-4 w-4 text-green-600" />,
+  error: <AlertCircle className="h-4 w-4 text-red-600" />,
+  info: <Info className="h-4 w-4 text-blue-600" />,
 }
 
-const bgMap = {
-  default: 'bg-white border-gray-200',
-  success: 'bg-white border-green-200',
-  destructive: 'bg-white border-red-200',
+const styles = {
+  success: 'border-green-200 bg-green-50',
+  error: 'border-red-200 bg-red-50',
+  info: 'border-blue-200 bg-blue-50',
 }
 
 export function ToastContainer() {
   const { toasts, removeToast } = useUIStore()
+
   return (
-    <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 w-80">
+    <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2">
       {toasts.map((t) => (
         <div
           key={t.id}
           className={cn(
-            'flex items-start gap-3 rounded-xl border p-4 shadow-lg animate-in slide-in-from-bottom-2',
-            bgMap[t.variant ?? 'default']
+            'flex items-center gap-3 rounded-xl border px-4 py-3 shadow-lg text-sm max-w-sm animate-in slide-in-from-right',
+            styles[t.type]
           )}
         >
-          {iconMap[t.variant ?? 'default']}
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900">{t.title}</p>
-            {t.description && <p className="text-xs text-gray-500 mt-0.5">{t.description}</p>}
-          </div>
-          <button onClick={() => removeToast(t.id)} className="p-0.5 hover:bg-gray-100 rounded">
-            <X className="w-3.5 h-3.5 text-gray-400" />
+          {icons[t.type]}
+          <span className="flex-1 text-slate-800">{t.message}</span>
+          <button onClick={() => removeToast(t.id)}>
+            <X className="h-3.5 w-3.5 text-slate-400" />
           </button>
         </div>
       ))}
