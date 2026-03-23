@@ -32,4 +32,4 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
     )
   }
 )
-textarea.displayName = 'Textarea'
+Textarea.displayName = 'Textarea'

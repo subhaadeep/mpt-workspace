@@ -1,27 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/api'
-import type { VideoStatus } from '@/lib/constants'
 
-export interface VideoIdea {
-  id: number
-  title: string
-  description: string
-  status: VideoStatus
-  script: string
-  created_at: string
-}
-
-export function useVideoIdeas() {
-  return useQuery<VideoIdea[]>({
+export function useVideos() {
+  return useQuery({
     queryKey: ['videos'],
-    queryFn: async () => (await api.get('/api/youtube/videos')).data,
+    queryFn: () => api.get('/api/youtube/videos').then((r) => r.data),
   })
 }
 
 export function useCreateVideo() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { title: string; description: string }) =>
+    mutationFn: (data: { title: string; description?: string; status?: string }) =>
       api.post('/api/youtube/videos', data).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['videos'] }),
   })
@@ -30,7 +20,7 @@ export function useCreateVideo() {
 export function useUpdateVideo() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, ...data }: Partial<VideoIdea> & { id: number }) =>
+    mutationFn: ({ id, ...data }: { id: number; status?: string; script?: string }) =>
       api.patch(`/api/youtube/videos/${id}`, data).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['videos'] }),
   })
