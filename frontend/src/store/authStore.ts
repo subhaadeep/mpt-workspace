@@ -1,58 +1,63 @@
-import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
-import api from '@/lib/api'
-import { setTokens, clearTokens } from '@/lib/auth'
+'use client'
 
-export interface User {
+import { create } from 'zustand'
+import api from '@/lib/api'
+import { clearTokens, setTokens, getAccessToken } from '@/lib/auth'
+
+export type User = {
   id: number
   email: string
-  full_name: string
+  full_name?: string
   role: string
   is_active: boolean
 }
 
-interface AuthState {
+type AuthState = {
   user: User | null
-  isLoading: boolean
+  loading: boolean
+  hydrated: boolean
   login: (email: string, password: string) => Promise<void>
   logout: () => void
   fetchMe: () => Promise<void>
 }
 
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set) => ({
-      user: null,
-      isLoading: false,
+export const useAuthStore = create<AuthState>((set) => ({
+  user: null,
+  loading: false,
+  hydrated: false,
 
-      login: async (email, password) => {
-        set({ isLoading: true })
-        const params = new URLSearchParams()
-        params.append('username', email)
-        params.append('password', password)
-        const { data } = await api.post('/api/auth/login', params, {
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        })
-        setTokens(data.access_token, data.refresh_token)
-        const me = await api.get('/api/users/me')
-        set({ user: me.data, isLoading: false })
-      },
+  login: async (email, password) => {
+    set({ loading: true })
+    try {
+      const { data } = await api.post('/api/auth/login', { email, password })
+      setTokens(data.access_token, data.refresh_token)
+      const me = await api.get('/api/users/me')
+      set({ user: me.data, loading: false, hydrated: true })
+    } catch (e) {
+      clearTokens()
+      set({ user: null, loading: false, hydrated: true })
+      throw e
+    }
+  },
 
-      logout: () => {
-        clearTokens()
-        set({ user: null })
-      },
+  logout: () => {
+    clearTokens()
+    set({ user: null, hydrated: true })
+    if (typeof window !== 'undefined') window.location.href = '/login'
+  },
 
-      fetchMe: async () => {
-        try {
-          const { data } = await api.get('/api/users/me')
-          set({ user: data })
-        } catch {
-          clearTokens()
-          set({ user: null })
-        }
-      },
-    }),
-    { name: 'auth-store', partialize: (s) => ({ user: s.user }) }
-  )
-)
+  fetchMe: async () => {
+    if (!getAccessToken()) {
+      set({ user: null, hydrated: true })
+      return
+    }
+    set({ loading: true })
+    try {
+      const { data } = await api.get('/api/users/me')
+      set({ user: data, loading: false, hydrated: true })
+    } catch {
+      clearTokens()
+      set({ user: null, loading: false, hydrated: true })
+    }
+  },
+}))
