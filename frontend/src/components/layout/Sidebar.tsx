@@ -1,88 +1,123 @@
 'use client'
+
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import {
+  LayoutDashboard,
+  Bot,
+  Youtube,
+  Shield,
+  User,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { useUIStore } from '@/store/uiStore'
-import {
-  LayoutDashboard, Bot, Youtube, ShieldCheck, ChevronLeft, ChevronRight, LogOut, User
-} from 'lucide-react'
 
 const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin','manager','bot_user','youtube_user','full_user'] },
-  { href: '/dashboard/bots', label: 'Bots', icon: Bot, roles: ['admin','manager','bot_user','full_user'] },
-  { href: '/dashboard/youtube', label: 'YouTube', icon: Youtube, roles: ['admin','manager','youtube_user','full_user'] },
-  { href: '/dashboard/admin', label: 'Admin', icon: ShieldCheck, roles: ['admin','manager'] },
+  {
+    href: '/dashboard',
+    label: 'Dashboard',
+    icon: LayoutDashboard,
+    roles: ['admin', 'manager', 'bot_user', 'youtube_user', 'full_user'],
+  },
+  {
+    href: '/dashboard/bots',
+    label: 'Bots',
+    icon: Bot,
+    roles: ['admin', 'manager', 'bot_user', 'full_user'],
+  },
+  {
+    href: '/dashboard/youtube',
+    label: 'YouTube',
+    icon: Youtube,
+    roles: ['admin', 'manager', 'youtube_user', 'full_user'],
+  },
+  {
+    href: '/dashboard/admin',
+    label: 'Admin',
+    icon: Shield,
+    roles: ['admin', 'manager'],
+  },
+  {
+    href: '/dashboard/profile',
+    label: 'Profile',
+    icon: User,
+    roles: ['admin', 'manager', 'bot_user', 'youtube_user', 'full_user'],
+  },
 ]
 
-export function Sidebar() {
+export default function Sidebar() {
   const pathname = usePathname()
-  const { user, logout } = useAuthStore()
-  const { sidebarCollapsed, toggleSidebar } = useUIStore()
-
-  const visibleItems = navItems.filter(
-    (item) => user && item.roles.includes(user.role)
-  )
+  const user = useAuthStore((s) => s.user)
+  const { sidebarOpen, toggleSidebar } = useUIStore()
 
   return (
     <aside
       className={cn(
-        'flex flex-col h-full bg-gray-900 text-white transition-all duration-300',
-        sidebarCollapsed ? 'w-16' : 'w-60'
+        'relative flex flex-col border-r border-slate-200 bg-white transition-all duration-200',
+        sidebarOpen ? 'w-60' : 'w-16'
       )}
     >
       {/* Logo */}
-      <div className="flex items-center justify-between px-4 py-5 border-b border-gray-800">
-        {!sidebarCollapsed && (
-          <span className="text-lg font-bold tracking-tight text-white">MPT<span className="text-brand-400"> Workspace</span></span>
+      <div className="flex h-16 items-center border-b border-slate-100 px-4 gap-3 overflow-hidden">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white text-sm font-bold">
+          M
+        </div>
+        {sidebarOpen && (
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-slate-900">MPT Workspace</p>
+            <p className="truncate text-xs text-slate-500">Trading & Content</p>
+          </div>
         )}
-        <button
-          onClick={toggleSidebar}
-          className="p-1.5 rounded-lg hover:bg-gray-800 transition ml-auto"
-        >
-          {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-        </button>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-2 py-4 space-y-1">
-        {visibleItems.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                active
-                  ? 'bg-brand-600 text-white'
-                  : 'text-gray-400 hover:bg-gray-800 hover:text-white'
-              )}
-            >
-              <Icon className="w-5 h-5 shrink-0" />
-              {!sidebarCollapsed && <span>{label}</span>}
-            </Link>
-          )
-        })}
+      <nav className="flex-1 p-3 space-y-1">
+        {navItems
+          .filter((item) => user?.role && item.roles.includes(user.role))
+          .map((item) => {
+            const Icon = item.icon
+            const active = pathname === item.href || pathname.startsWith(item.href + '/')
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                title={!sidebarOpen ? item.label : undefined}
+                className={cn(
+                  'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  active
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                )}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                {sidebarOpen && <span className="truncate">{item.label}</span>}
+              </Link>
+            )
+          })}
       </nav>
 
-      {/* User Footer */}
-      <div className="px-2 py-4 border-t border-gray-800 space-y-1">
-        <Link
-          href="/dashboard/profile"
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-gray-800 hover:text-white transition-colors"
-        >
-          <User className="w-5 h-5 shrink-0" />
-          {!sidebarCollapsed && <span className="truncate">{user?.full_name || 'Profile'}</span>}
-        </Link>
-        <button
-          onClick={logout}
-          className="flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-red-900/40 hover:text-red-400 transition-colors"
-        >
-          <LogOut className="w-5 h-5 shrink-0" />
-          {!sidebarCollapsed && <span>Logout</span>}
-        </button>
-      </div>
+      {/* Toggle button */}
+      <button
+        onClick={toggleSidebar}
+        className="absolute -right-3 top-20 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm hover:bg-slate-50"
+      >
+        {sidebarOpen ? (
+          <ChevronLeft className="h-3 w-3 text-slate-500" />
+        ) : (
+          <ChevronRight className="h-3 w-3 text-slate-500" />
+        )}
+      </button>
+
+      {/* User info */}
+      {sidebarOpen && user && (
+        <div className="border-t border-slate-100 px-4 py-3">
+          <p className="truncate text-xs font-medium text-slate-700">{user.full_name || user.email}</p>
+          <p className="truncate text-xs text-slate-400 uppercase">{user.role}</p>
+        </div>
+      )}
     </aside>
   )
 }
