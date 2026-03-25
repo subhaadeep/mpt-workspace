@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
 import os
 import logging
 
@@ -20,7 +21,6 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# Read allowed origins from env
 raw_origins = os.getenv(
     "ALLOWED_ORIGINS",
     "http://localhost:3000,http://127.0.0.1:3000"
@@ -35,11 +35,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount uploads directory
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
-# Include routers
 app.include_router(auth.router,         prefix="/api/auth",    tags=["Authentication"])
 app.include_router(users.router,        prefix="/api/users",   tags=["Users"])
 app.include_router(bots.router,         prefix="/api/bots",    tags=["Bots"])
@@ -51,14 +49,12 @@ app.include_router(files.router,        prefix="/api/files",   tags=["Files"])
 
 @app.on_event("startup")
 async def startup_event():
-    """Try to init DB but NEVER crash the server if it fails."""
     try:
         Base.metadata.create_all(bind=engine)
         init_db()
         logger.info("✅ Database initialized successfully.")
     except Exception as e:
         logger.error(f"⚠️ DB init failed (will retry on first request): {e}")
-        # Do NOT raise - let the server start anyway
 
 
 @app.get("/health")
@@ -68,11 +64,10 @@ def health_check():
 
 @app.get("/db-health")
 def db_health_check():
-    """Check DB connectivity separately."""
     try:
         from app.db.session import SessionLocal
         db = SessionLocal()
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         db.close()
         return {"status": "ok", "db": "connected"}
     except Exception as e:
