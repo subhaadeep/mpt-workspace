@@ -2,7 +2,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
-import time
 import logging
 
 from app.db.session import engine
@@ -21,7 +20,7 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# Read allowed origins from env, fallback to localhost for dev
+# Read allowed origins from env
 raw_origins = os.getenv(
     "ALLOWED_ORIGINS",
     "http://localhost:3000,http://127.0.0.1:3000"
@@ -36,7 +35,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount uploads directory for static file serving
+# Mount uploads directory
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
@@ -52,22 +51,29 @@ app.include_router(files.router,        prefix="/api/files",   tags=["Files"])
 
 @app.on_event("startup")
 async def startup_event():
-    # Retry DB connection up to 10 times (Render DB may take a moment)
-    max_retries = 10
-    for attempt in range(1, max_retries + 1):
-        try:
-            Base.metadata.create_all(bind=engine)
-            init_db()
-            logger.info("Database ready.")
-            return
-        except Exception as e:
-            logger.warning(f"DB not ready (attempt {attempt}/{max_retries}): {e}")
-            if attempt == max_retries:
-                logger.error("Could not connect to database after retries. Exiting.")
-                raise
-            time.sleep(3)
+    """Try to init DB but NEVER crash the server if it fails."""
+    try:
+        Base.metadata.create_all(bind=engine)
+        init_db()
+        logger.info("✅ Database initialized successfully.")
+    except Exception as e:
+        logger.error(f"⚠️ DB init failed (will retry on first request): {e}")
+        # Do NOT raise - let the server start anyway
 
 
 @app.get("/health")
 def health_check():
     return {"status": "ok", "service": "MPT Workspace API"}
+
+
+@app.get("/db-health")
+def db_health_check():
+    """Check DB connectivity separately."""
+    try:
+        from app.db.session import SessionLocal
+        db = SessionLocal()
+        db.execute("SELECT 1")
+        db.close()
+        return {"status": "ok", "db": "connected"}
+    except Exception as e:
+        return {"status": "error", "db": str(e)}
