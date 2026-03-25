@@ -1,26 +1,17 @@
-import { cn } from '@/lib/utils'
-
-export function Spinner({ className }: { className?: string }) {
+export function Spinner({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
+  const sz = size === 'sm' ? 'h-4 w-4' : size === 'lg' ? 'h-10 w-10' : 'h-6 w-6'
   return (
-    <svg
-      className={cn('animate-spin h-5 w-5 text-blue-600', className)}
-      fill="none"
-      viewBox="0 0 24 24"
-    >
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path
-        className="opacity-75"
-        fill="currentColor"
-        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-      />
-    </svg>
+    <div className={`${sz} animate-spin rounded-full border-2 border-blue-500/20 border-t-blue-500`} />
   )
 }
 
 export function PageLoader() {
   return (
-    <div className="min-h-screen grid place-items-center">
-      <Spinner className="h-8 w-8" />
+    <div className="flex h-screen items-center justify-center bg-[#0a0f1a]">
+      <div className="flex flex-col items-center gap-3">
+        <Spinner size="lg" />
+        <p className="text-sm text-slate-500">Loading...</p>
+      </div>
     </div>
   )
 }

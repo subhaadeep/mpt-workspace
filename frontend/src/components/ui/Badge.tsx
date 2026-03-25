@@ -1,32 +1,20 @@
 import { cn } from '@/lib/utils'
 
-type Variant = 'default' | 'success' | 'warning' | 'danger' | 'info'
+type Variant = 'default' | 'success' | 'error' | 'warning' | 'info'
 
-const variants: Record<Variant, string> = {
-  default: 'bg-slate-100 text-slate-700',
-  success: 'bg-green-100 text-green-700',
-  warning: 'bg-yellow-100 text-yellow-700',
-  danger: 'bg-red-100 text-red-700',
-  info: 'bg-blue-100 text-blue-700',
+const VARIANTS: Record<Variant, string> = {
+  default: 'bg-slate-700/50 text-slate-300 border-slate-600/30',
+  success: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  error:   'bg-red-500/10 text-red-400 border-red-500/20',
+  warning: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  info:    'bg-blue-500/10 text-blue-400 border-blue-500/20',
 }
 
-export function Badge({
-  children,
-  variant = 'default',
-  className,
-}: {
-  children: React.ReactNode
-  variant?: Variant
-  className?: string
+export function Badge({ children, variant = 'default', className }: {
+  children: React.ReactNode; variant?: Variant; className?: string
 }) {
   return (
-    <span
-      className={cn(
-        'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
-        variants[variant],
-        className
-      )}
-    >
+    <span className={cn('inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium', VARIANTS[variant], className)}>
       {children}
     </span>
   )
