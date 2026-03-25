@@ -1,6 +1,3 @@
-import DashboardShell from '@/components/layout/DashboardShell'
-import { type ReactNode } from 'react'
-
-export default function BotDetailLayout({ children }: { children: ReactNode }) {
-  return <DashboardShell>{children}</DashboardShell>
+export default function BotDetailLayout({ children }: { children: React.ReactNode }) {
+  return <>{children}</>
 }
