@@ -1,15 +1,27 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from app.db.session import SessionLocal
 from app.models.user import User
 from app.core.security import get_password_hash
 from app.core.config import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def init_db():
     db: Session = SessionLocal()
     try:
-        existing = db.query(User).filter(User.username == settings.FIRST_ADMIN_USERNAME).first()
-        if not existing:
+        # Remove any leftover old-format admin (email as username)
+        old = db.query(User).filter(User.username.contains('@')).first()
+        if old:
+            logger.info(f"[init_db] Removing old email-based user: {old.username}")
+            db.delete(old)
+            db.commit()
+
+        # Upsert the correct admin
+        admin = db.query(User).filter(User.username == settings.FIRST_ADMIN_USERNAME).first()
+        if not admin:
             admin = User(
                 username=settings.FIRST_ADMIN_USERNAME,
                 hashed_password=get_password_hash(settings.FIRST_ADMIN_PASSWORD),
@@ -21,8 +33,15 @@ def init_db():
             )
             db.add(admin)
             db.commit()
-            print(f"[init_db] Created default admin: {settings.FIRST_ADMIN_USERNAME}")
+            logger.info(f"[init_db] Created admin: {settings.FIRST_ADMIN_USERNAME}")
         else:
-            print("[init_db] Admin already exists, skipping.")
+            # Always reset password to make sure it's correct
+            admin.hashed_password = get_password_hash(settings.FIRST_ADMIN_PASSWORD)
+            admin.is_admin = True
+            admin.is_active = True
+            admin.can_access_bots = True
+            admin.can_access_youtube = True
+            db.commit()
+            logger.info(f"[init_db] Admin refreshed: {settings.FIRST_ADMIN_USERNAME}")
     finally:
         db.close()
