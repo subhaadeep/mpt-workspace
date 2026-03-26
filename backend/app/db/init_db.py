@@ -8,18 +8,20 @@ from app.core.config import settings
 def init_db():
     db: Session = SessionLocal()
     try:
-        existing = db.query(User).filter(User.email == settings.FIRST_ADMIN_EMAIL).first()
+        existing = db.query(User).filter(User.username == settings.FIRST_ADMIN_USERNAME).first()
         if not existing:
             admin = User(
-                email=settings.FIRST_ADMIN_EMAIL,
+                username=settings.FIRST_ADMIN_USERNAME,
                 hashed_password=get_password_hash(settings.FIRST_ADMIN_PASSWORD),
                 full_name="Admin",
-                role="admin",
+                is_admin=True,
                 is_active=True,
+                can_access_bots=True,
+                can_access_youtube=True,
             )
             db.add(admin)
             db.commit()
-            print(f"[init_db] Created default admin: {settings.FIRST_ADMIN_EMAIL}")
+            print(f"[init_db] Created default admin: {settings.FIRST_ADMIN_USERNAME}")
         else:
             print("[init_db] Admin already exists, skipping.")
     finally:

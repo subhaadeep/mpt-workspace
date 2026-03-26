@@ -6,9 +6,11 @@ import { clearTokens, setTokens, getAccessToken } from '@/lib/auth'
 
 export type User = {
   id: number
-  email: string
+  username: string
   full_name?: string
-  role: string
+  is_admin: boolean
+  can_access_bots: boolean
+  can_access_youtube: boolean
   is_active: boolean
 }
 
@@ -16,7 +18,7 @@ type AuthState = {
   user: User | null
   loading: boolean
   hydrated: boolean
-  login: (email: string, password: string) => Promise<void>
+  login: (username: string, password: string) => Promise<void>
   logout: () => void
   fetchMe: () => Promise<void>
 }
@@ -26,10 +28,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   loading: false,
   hydrated: false,
 
-  login: async (email, password) => {
+  login: async (username, password) => {
     set({ loading: true })
     try {
-      const { data } = await api.post('/api/auth/login', { email, password })
+      const { data } = await api.post('/api/auth/login', { username, password })
       setTokens(data.access_token, data.refresh_token)
       const me = await api.get('/api/users/me')
       set({ user: me.data, loading: false, hydrated: true })
