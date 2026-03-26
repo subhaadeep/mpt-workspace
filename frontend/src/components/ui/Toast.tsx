@@ -5,8 +5,8 @@ import { cn } from '@/lib/utils'
 
 const ICONS = {
   success: CheckCircle2,
-  error: AlertCircle,
-  info: Info,
+  error:   AlertCircle,
+  info:    Info,
   warning: AlertTriangle,
 }
 const COLORS = {
@@ -19,11 +19,17 @@ const COLORS = {
 export function ToastContainer() {
   const { toasts, removeToast } = useUIStore()
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 min-w-[280px] max-w-sm">
+    <div className="fixed bottom-5 right-5 z-[9999] flex flex-col gap-2 min-w-[280px] max-w-sm pointer-events-none">
       {toasts.map(t => {
         const Icon = ICONS[t.type]
         return (
-          <div key={t.id} className={cn('flex items-start gap-3 rounded-xl border px-4 py-3 shadow-2xl backdrop-blur-md', COLORS[t.type])}>
+          <div
+            key={t.id}
+            className={cn(
+              'flex items-start gap-3 rounded-xl border px-4 py-3 shadow-2xl backdrop-blur-md pointer-events-auto',
+              COLORS[t.type]
+            )}
+          >
             <Icon className="h-4 w-4 mt-0.5 shrink-0" />
             <span className="flex-1 text-sm">{t.message}</span>
             <button onClick={() => removeToast(t.id)} className="text-current opacity-50 hover:opacity-100">

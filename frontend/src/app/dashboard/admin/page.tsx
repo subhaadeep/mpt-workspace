@@ -14,7 +14,7 @@ type AccessRequest = {
 
 type UserRecord = {
   id: number; username: string; full_name?: string
-  is_admin: boolean; is_active: boolean
+  is_admin: boolean; is_super_admin?: boolean; is_active: boolean
   can_access_bots: boolean; can_access_youtube: boolean; created_at: string
 }
 
@@ -47,6 +47,7 @@ export default function AdminPage() {
   const rejectMutation = useMutation({
     mutationFn: (id: number) => api.post(`/api/admin/access-requests/${id}/reject`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['access-requests'] }); addToast('Request rejected', 'info') },
+    onError: () => addToast('Failed to reject', 'error'),
   })
 
   const updateUserMutation = useMutation({
@@ -58,7 +59,18 @@ export default function AdminPage() {
   const deleteUserMutation = useMutation({
     mutationFn: (id: number) => api.delete(`/api/admin/users/${id}`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-users'] }); addToast('User deleted', 'info') },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      addToast(msg ?? 'Failed to delete user', 'error')
+    },
   })
+
+  function confirmDelete(u: UserRecord) {
+    if (u.is_super_admin) { addToast('Cannot delete the super admin account', 'error'); return }
+    if (u.is_admin) { addToast('Revoke admin first, then delete', 'error'); return }
+    if (!window.confirm(`Delete user "${u.full_name || u.username}"? This cannot be undone.`)) return
+    deleteUserMutation.mutate(u.id)
+  }
 
   const pendingRequests = requests.filter(r => r.status === 'pending')
   const processedRequests = requests.filter(r => r.status !== 'pending')
@@ -121,12 +133,15 @@ export default function AdminPage() {
                 </label>
               </div>
               <div className="mt-3 flex gap-2">
-                <button onClick={() => approveMutation.mutate({ id: req.id, bots: getAccess(req.id).bots, youtube: getAccess(req.id).youtube })}
+                <button
+                  onClick={() => approveMutation.mutate({ id: req.id, bots: getAccess(req.id).bots, youtube: getAccess(req.id).youtube })}
                   disabled={approveMutation.isPending}
                   className="flex items-center gap-1.5 rounded-xl bg-emerald-600/20 border border-emerald-500/30 px-4 py-2 text-sm font-medium text-emerald-400 hover:bg-emerald-600/30 disabled:opacity-60">
                   <CheckCircle2 className="h-4 w-4" /> Approve
                 </button>
-                <button onClick={() => rejectMutation.mutate(req.id)} disabled={rejectMutation.isPending}
+                <button
+                  onClick={() => rejectMutation.mutate(req.id)}
+                  disabled={rejectMutation.isPending}
                   className="flex items-center gap-1.5 rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/20 disabled:opacity-60">
                   <XCircle className="h-4 w-4" /> Reject
                 </button>
@@ -151,16 +166,22 @@ export default function AdminPage() {
                 <span className="font-medium text-white">{u.full_name || u.username}</span>
                 <span className="text-xs text-slate-500 ml-2">@{u.username}</span>
               </div>
-              <span className="rounded-full bg-blue-500/15 border border-blue-500/20 px-2.5 py-0.5 text-xs text-blue-400">Admin</span>
+              {u.is_super_admin
+                ? <span className="rounded-full bg-purple-500/15 border border-purple-500/20 px-2.5 py-0.5 text-xs text-purple-400">Super Admin</span>
+                : <span className="rounded-full bg-blue-500/15 border border-blue-500/20 px-2.5 py-0.5 text-xs text-blue-400">Admin</span>
+              }
             </div>
           ))}
         </div>
       </section>
 
-      {/* ── REGULAR USERS + ACCESS CONTROL ── */}
+      {/* ── REGULAR USERS ── */}
       <section>
         <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">All Users</h2>
         {loadingUsers && <div className="flex justify-center py-8"><Spinner /></div>}
+        {!loadingUsers && nonAdminUsers.length === 0 && (
+          <div className="rounded-2xl border border-white/5 bg-white/2 py-10 text-center text-sm text-slate-600">No regular users</div>
+        )}
         <div className="space-y-2">
           {nonAdminUsers.map(u => (
             <div key={u.id} className="rounded-2xl border border-white/5 bg-white/2 px-4 py-3">
@@ -170,7 +191,6 @@ export default function AdminPage() {
                   <span className="text-xs text-slate-500 ml-2">@{u.username}</span>
                 </div>
                 <div className="flex items-center gap-3 flex-wrap">
-                  {/* Access toggles */}
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input type="checkbox" checked={u.can_access_bots}
                       onChange={e => updateUserMutation.mutate({ id: u.id, data: { can_access_bots: e.target.checked } })}
@@ -186,10 +206,9 @@ export default function AdminPage() {
                     <span className="text-xs text-slate-400">YouTube</span>
                   </label>
 
-                  {/* Grant/Revoke Admin */}
                   <button
                     onClick={() => {
-                      if (confirm(`Make ${u.full_name || u.username} an admin? This gives full access.`)) {
+                      if (window.confirm(`Make ${u.full_name || u.username} an admin? This gives full access.`)) {
                         updateUserMutation.mutate({ id: u.id, data: { is_admin: true } })
                       }
                     }}
@@ -197,8 +216,10 @@ export default function AdminPage() {
                     <ShieldCheck className="h-3.5 w-3.5" /> Make Admin
                   </button>
 
-                  <button onClick={() => deleteUserMutation.mutate(u.id)}
-                    className="rounded-lg p-1.5 text-slate-600 hover:bg-red-500/10 hover:text-red-400">
+                  <button
+                    onClick={() => confirmDelete(u)}
+                    disabled={deleteUserMutation.isPending}
+                    className="rounded-lg p-1.5 text-slate-600 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-40">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -208,14 +229,14 @@ export default function AdminPage() {
         </div>
       </section>
 
-      {/* Revoke admin section */}
-      {adminUsers.filter(u => u.id !== undefined).length > 0 && (
+      {/* ── REVOKE ADMIN ── */}
+      {adminUsers.filter(u => !u.is_super_admin).length > 0 && (
         <section>
           <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-2">
             <ShieldOff className="h-4 w-4 text-red-400" /> Revoke Admin Access
           </h2>
           <div className="space-y-2">
-            {adminUsers.map(u => (
+            {adminUsers.filter(u => !u.is_super_admin).map(u => (
               <div key={u.id} className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/2 px-4 py-3">
                 <div>
                   <span className="text-sm text-white">{u.full_name || u.username}</span>
@@ -223,7 +244,7 @@ export default function AdminPage() {
                 </div>
                 <button
                   onClick={() => {
-                    if (confirm(`Revoke admin from ${u.full_name || u.username}?`)) {
+                    if (window.confirm(`Revoke admin from ${u.full_name || u.username}?`)) {
                       updateUserMutation.mutate({ id: u.id, data: { is_admin: false } })
                     }
                   }}
@@ -236,7 +257,7 @@ export default function AdminPage() {
         </section>
       )}
 
-      {/* PROCESSED REQUESTS */}
+      {/* ── PROCESSED REQUESTS ── */}
       {processedRequests.length > 0 && (
         <section>
           <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">Processed Requests</h2>
@@ -248,7 +269,9 @@ export default function AdminPage() {
                   <span className="text-xs text-slate-600 ml-2">@{req.username}</span>
                 </div>
                 <span className={`rounded-full px-2.5 py-0.5 text-xs border ${
-                  req.status === 'approved' ? 'bg-emerald-500/15 border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border-red-500/20 text-red-400'
+                  req.status === 'approved'
+                    ? 'bg-emerald-500/15 border-emerald-500/20 text-emerald-400'
+                    : 'bg-red-500/10 border-red-500/20 text-red-400'
                 }`}>{req.status}</span>
               </div>
             ))}

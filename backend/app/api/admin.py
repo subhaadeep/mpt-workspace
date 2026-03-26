@@ -44,13 +44,11 @@ def update_user(
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    # Block demoting super admin via normal update
     if user.is_super_admin and data.is_admin is False:
         raise HTTPException(
             status_code=403,
             detail="Cannot demote the super admin. Transfer super admin role first."
         )
-    # Block removing is_admin from super admin entirely
     if user.is_super_admin and data.is_admin is not None and not data.is_admin:
         raise HTTPException(status_code=403, detail="Super admin cannot be demoted.")
     for key, value in data.model_dump(exclude_unset=True).items():
@@ -71,8 +69,7 @@ def delete_user(
         raise HTTPException(status_code=404, detail="User not found")
     if user.is_super_admin:
         raise HTTPException(status_code=403, detail="Cannot delete the super admin account.")
-    if user.is_admin:
-        raise HTTPException(status_code=400, detail="Cannot delete admin account")
+    # Allow deleting admin users (non-super-admin) — admin can manage other admins
     db.delete(user)
     db.commit()
 
@@ -83,7 +80,6 @@ def transfer_super_admin(
     db: Session = Depends(get_db),
     current_super: User = Depends(get_current_super_admin)
 ):
-    """Super admin transfers their role to another existing admin, then loses super admin status."""
     new_super = db.query(User).filter(User.id == data.new_super_admin_id).first()
     if not new_super:
         raise HTTPException(status_code=404, detail="Target user not found")
@@ -91,7 +87,6 @@ def transfer_super_admin(
         raise HTTPException(status_code=400, detail="Target user must already be an admin")
     if new_super.id == current_super.id:
         raise HTTPException(status_code=400, detail="You are already the super admin")
-    # Transfer
     current_super.is_super_admin = False
     new_super.is_super_admin = True
     db.commit()
