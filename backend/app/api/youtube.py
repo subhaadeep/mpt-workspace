@@ -40,14 +40,23 @@ def get_video(video_id: int, db: Session = Depends(get_db), current_user: User =
 
 
 @router.patch("/{video_id}", response_model=VideoOut)
-def update_video(video_id: int, data: VideoUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_youtube_access)):
+def update_video(
+    video_id: int,
+    data: VideoUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_youtube_access)
+):
     video = db.query(YouTubeVideo).filter(YouTubeVideo.id == video_id).first()
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
-    for key, value in data.model_dump(exclude_unset=True).items():
+    old_status = video.status
+    updates = data.model_dump(exclude_unset=True)
+    for key, value in updates.items():
         setattr(video, key, value)
     db.commit()
     db.refresh(video)
+    # Attach old_status on response so frontend can compare
+    video.__dict__['_old_status'] = old_status
     return video
 
 

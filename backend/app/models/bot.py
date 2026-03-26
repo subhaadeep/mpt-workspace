@@ -9,9 +9,14 @@ class Bot(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(200), nullable=False, index=True)
     description = Column(Text, nullable=True)
-    tags = Column(String(500), nullable=True)          # comma-separated tags
-    priority = Column(Integer, default=0)              # lower = higher importance (rank)
-    status = Column(String(50), default="active")      # active | archived | experimental
+    tags = Column(String(500), nullable=True)
+    priority = Column(Integer, default=0)
+    status = Column(String(50), default="active")          # active | archived | experimental
+    # Trading account info (only relevant when status=active)
+    account_type = Column(String(20), nullable=True)       # "real" | "demo"
+    account_broker = Column(String(100), nullable=True)    # e.g. Zerodha, Fyers
+    account_id = Column(String(200), nullable=True)        # account/client ID
+    account_balance = Column(String(50), nullable=True)    # e.g. "50000"
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

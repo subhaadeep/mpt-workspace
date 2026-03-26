@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle2, XCircle, User, Shield, Clock, Trash2, Bot, Youtube } from 'lucide-react'
+import { CheckCircle2, XCircle, User, Shield, Clock, Trash2, Bot, Youtube, ShieldCheck, ShieldOff } from 'lucide-react'
 import api from '@/lib/api'
 import { useUIStore } from '@/store/uiStore'
 import { Spinner } from '@/components/ui/Spinner'
@@ -52,6 +52,7 @@ export default function AdminPage() {
   const updateUserMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: object }) => api.patch(`/api/admin/users/${id}`, data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-users'] }); addToast('User updated', 'success') },
+    onError: () => addToast('Failed to update user', 'error'),
   })
 
   const deleteUserMutation = useMutation({
@@ -67,14 +68,19 @@ export default function AdminPage() {
     setAccessOptions(prev => ({ ...prev, [id]: { ...getAccess(id), [key]: val } }))
   }
 
+  const nonAdminUsers = users.filter(u => !u.is_admin)
+  const adminUsers = users.filter(u => u.is_admin)
+
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-white flex items-center gap-2"><Shield className="h-6 w-6 text-blue-400" /> Admin Panel</h1>
-        <p className="text-sm text-slate-500 mt-1">Manage access requests and users</p>
+        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+          <Shield className="h-6 w-6 text-blue-400" /> Admin Panel
+        </h1>
+        <p className="text-sm text-slate-500 mt-1">Manage access requests, users and admin privileges</p>
       </div>
 
-      {/* PENDING REQUESTS */}
+      {/* ── PENDING REQUESTS ── */}
       <section>
         <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-2">
           <Clock className="h-4 w-4 text-amber-400" /> Pending Access Requests
@@ -130,22 +136,41 @@ export default function AdminPage() {
         </div>
       </section>
 
-      {/* USERS */}
+      {/* ── ADMIN USERS ── */}
+      <section>
+        <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-2">
+          <ShieldCheck className="h-4 w-4 text-blue-400" /> Admin Accounts
+        </h2>
+        <div className="space-y-2">
+          {adminUsers.map(u => (
+            <div key={u.id} className="flex items-center gap-3 rounded-2xl border border-blue-500/20 bg-blue-500/5 px-4 py-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600/25">
+                <Shield className="h-4 w-4 text-blue-400" />
+              </div>
+              <div className="flex-1">
+                <span className="font-medium text-white">{u.full_name || u.username}</span>
+                <span className="text-xs text-slate-500 ml-2">@{u.username}</span>
+              </div>
+              <span className="rounded-full bg-blue-500/15 border border-blue-500/20 px-2.5 py-0.5 text-xs text-blue-400">Admin</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── REGULAR USERS + ACCESS CONTROL ── */}
       <section>
         <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">All Users</h2>
         {loadingUsers && <div className="flex justify-center py-8"><Spinner /></div>}
         <div className="space-y-2">
-          {users.map(u => (
-            <div key={u.id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/5 bg-white/2 px-4 py-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
+          {nonAdminUsers.map(u => (
+            <div key={u.id} className="rounded-2xl border border-white/5 bg-white/2 px-4 py-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex-1 min-w-0">
                   <span className="font-medium text-white">{u.full_name || u.username}</span>
-                  <span className="text-xs text-slate-500">@{u.username}</span>
-                  {u.is_admin && <span className="rounded-full bg-blue-500/15 border border-blue-500/20 px-2 py-0.5 text-[10px] text-blue-400">Admin</span>}
+                  <span className="text-xs text-slate-500 ml-2">@{u.username}</span>
                 </div>
-              </div>
-              {!u.is_admin && (
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
+                  {/* Access toggles */}
                   <label className="flex items-center gap-1.5 cursor-pointer">
                     <input type="checkbox" checked={u.can_access_bots}
                       onChange={e => updateUserMutation.mutate({ id: u.id, data: { can_access_bots: e.target.checked } })}
@@ -160,17 +185,58 @@ export default function AdminPage() {
                     <Youtube className="h-3.5 w-3.5 text-red-400" />
                     <span className="text-xs text-slate-400">YouTube</span>
                   </label>
+
+                  {/* Grant/Revoke Admin */}
+                  <button
+                    onClick={() => {
+                      if (confirm(`Make ${u.full_name || u.username} an admin? This gives full access.`)) {
+                        updateUserMutation.mutate({ id: u.id, data: { is_admin: true } })
+                      }
+                    }}
+                    className="flex items-center gap-1.5 rounded-lg border border-blue-500/20 bg-blue-500/10 px-2.5 py-1 text-xs text-blue-400 hover:bg-blue-500/20 transition-all">
+                    <ShieldCheck className="h-3.5 w-3.5" /> Make Admin
+                  </button>
+
                   <button onClick={() => deleteUserMutation.mutate(u.id)}
                     className="rounded-lg p-1.5 text-slate-600 hover:bg-red-500/10 hover:text-red-400">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
-              )}
+              </div>
             </div>
           ))}
         </div>
       </section>
 
+      {/* Revoke admin section */}
+      {adminUsers.filter(u => u.id !== undefined).length > 0 && (
+        <section>
+          <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-2">
+            <ShieldOff className="h-4 w-4 text-red-400" /> Revoke Admin Access
+          </h2>
+          <div className="space-y-2">
+            {adminUsers.map(u => (
+              <div key={u.id} className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/2 px-4 py-3">
+                <div>
+                  <span className="text-sm text-white">{u.full_name || u.username}</span>
+                  <span className="text-xs text-slate-600 ml-2">@{u.username}</span>
+                </div>
+                <button
+                  onClick={() => {
+                    if (confirm(`Revoke admin from ${u.full_name || u.username}?`)) {
+                      updateUserMutation.mutate({ id: u.id, data: { is_admin: false } })
+                    }
+                  }}
+                  className="flex items-center gap-1.5 rounded-lg border border-red-500/20 bg-red-500/10 px-2.5 py-1 text-xs text-red-400 hover:bg-red-500/20">
+                  <ShieldOff className="h-3.5 w-3.5" /> Revoke Admin
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* PROCESSED REQUESTS */}
       {processedRequests.length > 0 && (
         <section>
           <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">Processed Requests</h2>

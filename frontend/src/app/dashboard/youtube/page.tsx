@@ -2,10 +2,7 @@
 
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import {
-  Plus, X, ChevronRight, Trash2, ExternalLink,
-  FileText, Film, Scissors, Image, Upload, Tag, Youtube
-} from 'lucide-react'
+import { Plus, X, ChevronRight, Trash2, ExternalLink, FileText, Film, Scissors, Image, Upload, Tag, Youtube } from 'lucide-react'
 import { Spinner } from '@/components/ui/Spinner'
 import { useUIStore } from '@/store/uiStore'
 import api from '@/lib/api'
@@ -24,7 +21,10 @@ type Video = {
   created_at: string
 }
 
-const STAGES: { key: VideoStatus; label: string; icon: React.ElementType; color: string; bg: string; border: string; dot: string }[] = [
+const STAGES: {
+  key: VideoStatus; label: string; icon: React.ElementType
+  color: string; bg: string; border: string; dot: string
+}[] = [
   { key: 'script',    label: 'Script',    icon: FileText, color: 'text-violet-400', bg: 'bg-violet-500/10',  border: 'border-violet-500/25', dot: 'bg-violet-400' },
   { key: 'raw_files', label: 'Raw Files', icon: Film,     color: 'text-blue-400',   bg: 'bg-blue-500/10',    border: 'border-blue-500/25',   dot: 'bg-blue-400' },
   { key: 'editing',   label: 'Editing',   icon: Scissors, color: 'text-amber-400',  bg: 'bg-amber-500/10',   border: 'border-amber-500/25',  dot: 'bg-amber-400' },
@@ -48,7 +48,7 @@ function StatusPill({ status }: { status: VideoStatus }) {
 
 function VideoDrawer({ video, onClose }: { video: Video; onClose: () => void }) {
   const qc = useQueryClient()
-  const addToast = useUIStore(s => s.addToast)
+  const { addToast, addPipelineNotification } = useUIStore()
   const [title, setTitle] = useState(video.title)
   const [desc, setDesc] = useState(video.idea_description || '')
   const [script, setScript] = useState(video.script || '')
@@ -57,23 +57,37 @@ function VideoDrawer({ video, onClose }: { video: Video; onClose: () => void }) 
   const [tab, setTab] = useState<'info' | 'script'>('info')
 
   const update = useMutation({
-    mutationFn: (payload: Partial<Video>) => api.patch(`/api/youtube/videos/${video.id}`, payload).then(r => r.data),
+    mutationFn: (payload: Partial<Video>) =>
+      api.patch(`/api/youtube/${video.id}`, payload).then(r => r.data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['videos'] }); addToast('Saved!', 'success') },
     onError: () => addToast('Save failed', 'error'),
   })
 
   const advance = useMutation({
-    mutationFn: (status: VideoStatus) => api.patch(`/api/youtube/videos/${video.id}`, { status }).then(r => r.data),
-    onSuccess: (data) => { qc.invalidateQueries({ queryKey: ['videos'] }); addToast(`Moved to ${STAGES.find(s => s.key === data.status)?.label}!`, 'success'); onClose() },
+    mutationFn: (newStatus: VideoStatus) =>
+      api.patch(`/api/youtube/${video.id}`, { status: newStatus }).then(r => r.data),
+    onSuccess: (data: Video) => {
+      qc.invalidateQueries({ queryKey: ['videos'] })
+      const fromLabel = STAGES.find(s => s.key === video.status)?.label || video.status
+      const toLabel = STAGES.find(s => s.key === data.status)?.label || data.status
+      addToast(`Moved to ${toLabel}! ✓`, 'success')
+      addPipelineNotification(video.title, video.status, data.status)
+      onClose()
+    },
+    onError: (e: unknown) => {
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      addToast(msg || 'Failed to move stage', 'error')
+    },
   })
 
   const del = useMutation({
-    mutationFn: () => api.delete(`/api/youtube/videos/${video.id}`),
+    mutationFn: () => api.delete(`/api/youtube/${video.id}`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['videos'] }); addToast('Deleted', 'info'); onClose() },
   })
 
   const nextStatus = NEXT_STATUS[video.status]
   const nextStage = nextStatus ? STAGES.find(s => s.key === nextStatus) : null
+  const currentStage = STAGES.find(s => s.key === video.status)!
 
   return (
     <div className="fixed inset-0 z-50 flex">
@@ -89,6 +103,26 @@ function VideoDrawer({ video, onClose }: { video: Video; onClose: () => void }) 
           <button onClick={onClose} className="shrink-0 rounded-lg p-2 text-slate-500 hover:bg-white/5 hover:text-slate-300">
             <X className="h-4 w-4" />
           </button>
+        </div>
+
+        {/* Pipeline progress inside drawer */}
+        <div className="flex border-b border-white/5 px-4 py-2 gap-1 overflow-x-auto">
+          {STAGES.map((s, i) => {
+            const isPast = STAGES.findIndex(x => x.key === video.status) > i
+            const isCurrent = s.key === video.status
+            return (
+              <div key={s.key} className="flex items-center gap-1">
+                <div className={`flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-medium transition-all ${
+                  isCurrent ? `${s.bg} ${s.color} border ${s.border}` :
+                  isPast ? 'bg-white/5 text-slate-500' : 'text-slate-700'
+                }`}>
+                  <s.icon className="h-3 w-3" />
+                  {s.label}
+                </div>
+                {i < STAGES.length - 1 && <ChevronRight className="h-3 w-3 text-slate-700 shrink-0" />}
+              </div>
+            )
+          })}
         </div>
 
         {/* Tabs */}
@@ -119,7 +153,7 @@ function VideoDrawer({ video, onClose }: { video: Video; onClose: () => void }) 
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1.5">
-                  <Tag className="inline h-3 w-3 mr-1" />Tags (comma-separated)
+                  <Tag className="inline h-3 w-3 mr-1" />Tags
                 </label>
                 <input value={tags} onChange={e => setTags(e.target.value)} placeholder="shorts, nifty, analysis"
                   className="w-full rounded-xl border border-white/8 bg-white/4 px-3 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:border-blue-500/60" />
@@ -144,10 +178,13 @@ function VideoDrawer({ video, onClose }: { video: Video; onClose: () => void }) 
         {/* Footer */}
         <div className="border-t border-white/5 px-6 py-4 space-y-2">
           {nextStage && (
-            <button onClick={() => advance.mutate(nextStatus!)} disabled={advance.isPending}
-              className={`w-full flex items-center justify-center gap-2 rounded-xl border ${nextStage.border} ${nextStage.bg} py-2.5 text-sm font-semibold ${nextStage.color} hover:opacity-80 disabled:opacity-50 transition-all`}>
-              {advance.isPending ? <Spinner size="sm" /> : <ChevronRight className="h-4 w-4" />}
-              Move to {nextStage.label}
+            <button
+              onClick={() => { if (!advance.isPending) advance.mutate(nextStatus!) }}
+              disabled={advance.isPending}
+              className={`w-full flex items-center justify-center gap-2 rounded-xl border ${nextStage.border} ${nextStage.bg} py-3 text-sm font-semibold ${nextStage.color} hover:opacity-80 disabled:opacity-50 transition-all cursor-pointer`}>
+              {advance.isPending
+                ? <><Spinner size="sm" /> Moving...</>
+                : <><ChevronRight className="h-4 w-4" /> Move to {nextStage.label}</>}
             </button>
           )}
           {video.status === 'uploaded' && video.youtube_url && (
@@ -156,7 +193,9 @@ function VideoDrawer({ video, onClose }: { video: Video; onClose: () => void }) 
               <ExternalLink className="h-4 w-4" /> View on YouTube
             </a>
           )}
-          <button onClick={() => update.mutate({ title, idea_description: desc, script, tags, youtube_url: ytUrl })} disabled={update.isPending}
+          <button
+            onClick={() => update.mutate({ title, idea_description: desc, script, tags, youtube_url: ytUrl })}
+            disabled={update.isPending}
             className="w-full flex items-center justify-center gap-2 rounded-xl border border-white/8 bg-white/4 py-2.5 text-sm font-semibold text-slate-300 hover:bg-white/8 disabled:opacity-50 transition-all">
             {update.isPending ? <Spinner size="sm" /> : null} Save Changes
           </button>
@@ -188,7 +227,7 @@ export default function YoutubePage() {
     mutationFn: (payload: object) => api.post('/api/youtube/', payload).then(r => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['videos'] })
-      addToast('Video added to Script stage!', 'success')
+      addToast('Video added!', 'success')
       setShowCreate(false); setNewTitle(''); setNewDesc(''); setNewTags('')
     },
     onError: () => addToast('Failed to create video', 'error'),
@@ -234,9 +273,7 @@ export default function YoutubePage() {
 
       {/* Kanban board */}
       {isLoading ? (
-        <div className="flex flex-1 items-center justify-center">
-          <Spinner size="lg" />
-        </div>
+        <div className="flex flex-1 items-center justify-center"><Spinner size="lg" /></div>
       ) : (
         <div className="flex gap-4 overflow-x-auto pb-4 flex-1 min-h-0">
           {STAGES.map(s => {
@@ -244,7 +281,6 @@ export default function YoutubePage() {
             const cols = byStatus[s.key] ?? []
             return (
               <div key={s.key} className="flex flex-col min-w-[240px] max-w-[260px] flex-shrink-0">
-                {/* Column header */}
                 <div className={`flex items-center gap-2 rounded-t-2xl border ${s.border} ${s.bg} px-4 py-3`}>
                   <Icon className={`h-4 w-4 ${s.color}`} />
                   <span className={`text-sm font-semibold ${s.color}`}>{s.label}</span>
@@ -252,7 +288,6 @@ export default function YoutubePage() {
                     {cols.length}
                   </span>
                 </div>
-                {/* Cards */}
                 <div className={`flex flex-col gap-3 rounded-b-2xl border-x border-b ${s.border} bg-white/2 p-3 flex-1 min-h-[180px]`}>
                   {cols.length === 0 && (
                     <div className="flex flex-col items-center justify-center flex-1 py-8">
@@ -263,7 +298,7 @@ export default function YoutubePage() {
                   {cols.map(v => (
                     <button key={v.id} onClick={() => setSelected(v)}
                       className="group w-full rounded-xl border border-white/8 bg-[#0d1424] p-4 text-left hover:border-white/20 hover:bg-white/4 transition-all">
-                      <p className={`text-sm font-medium text-white line-clamp-2 group-hover:${s.color}`}>{v.title}</p>
+                      <p className="text-sm font-medium text-white line-clamp-2">{v.title}</p>
                       {v.idea_description && (
                         <p className="mt-1.5 text-xs text-slate-500 line-clamp-2">{v.idea_description}</p>
                       )}
@@ -284,10 +319,8 @@ export default function YoutubePage() {
         </div>
       )}
 
-      {/* Video detail drawer */}
       {selected && <VideoDrawer video={selected} onClose={() => setSelected(null)} />}
 
-      {/* Create modal */}
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowCreate(false)} />
@@ -315,12 +348,11 @@ export default function YoutubePage() {
                   className="w-full rounded-xl border border-white/8 bg-white/4 px-4 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:border-blue-500/60 resize-none" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1.5">Tags (comma-separated)</label>
-                <input value={newTags} onChange={e => setNewTags(e.target.value)}
-                  placeholder="shorts, trading, nifty50"
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">Tags</label>
+                <input value={newTags} onChange={e => setNewTags(e.target.value)} placeholder="shorts, trading, nifty50"
                   className="w-full rounded-xl border border-white/8 bg-white/4 px-4 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:border-blue-500/60" />
               </div>
-              <p className="text-xs text-slate-600">Video will start in the <span className="text-violet-400">Script</span> stage.</p>
+              <p className="text-xs text-slate-600">Starts in <span className="text-violet-400">Script</span> stage.</p>
               <div className="flex justify-end gap-2 pt-1">
                 <button type="button" onClick={() => setShowCreate(false)}
                   className="rounded-xl border border-white/8 px-4 py-2 text-sm text-slate-400 hover:bg-white/5">Cancel</button>

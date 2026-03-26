@@ -19,6 +19,7 @@ class UserUpdate(BaseModel):
     can_access_bots: Optional[bool] = None
     can_access_youtube: Optional[bool] = None
     is_active: Optional[bool] = None
+    is_admin: Optional[bool] = None   # ← NEW: allow toggling admin
 
 
 class UserOut(UserBase):

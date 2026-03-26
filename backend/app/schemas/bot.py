@@ -9,6 +9,10 @@ class BotCreate(BaseModel):
     tags: Optional[str] = None
     priority: Optional[int] = 0
     status: Optional[str] = "active"
+    account_type: Optional[str] = None
+    account_broker: Optional[str] = None
+    account_id: Optional[str] = None
+    account_balance: Optional[str] = None
 
 
 class BotUpdate(BaseModel):
@@ -17,6 +21,10 @@ class BotUpdate(BaseModel):
     tags: Optional[str] = None
     priority: Optional[int] = None
     status: Optional[str] = None
+    account_type: Optional[str] = None
+    account_broker: Optional[str] = None
+    account_id: Optional[str] = None
+    account_balance: Optional[str] = None
 
 
 class BotOut(BaseModel):
@@ -26,6 +34,10 @@ class BotOut(BaseModel):
     tags: Optional[str]
     priority: int
     status: str
+    account_type: Optional[str] = None
+    account_broker: Optional[str] = None
+    account_id: Optional[str] = None
+    account_balance: Optional[str] = None
     created_by: int
     created_at: datetime
     updated_at: Optional[datetime]
