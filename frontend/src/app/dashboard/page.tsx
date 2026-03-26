@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useAuthStore } from '@/store/authStore'
 import { useQuery } from '@tanstack/react-query'
-import { Bot, Youtube, Shield, Users, Clock, TrendingUp, ArrowRight, Bell, Activity, Film, Scissors, Image, Upload, FileText, Archive, ChevronRight, Trash2, UserCheck, X, Eye, EyeOff, Key } from 'lucide-react'
+import { Bot, Youtube, Shield, Users, Clock, TrendingUp, ArrowRight, Bell, Film, Scissors, Image, Upload, FileText, Archive, ChevronRight, Trash2, UserCheck, X, Eye, EyeOff, Key } from 'lucide-react'
 import Link from 'next/link'
 import api from '@/lib/api'
 
@@ -200,43 +200,48 @@ export default function DashboardHome() {
         })}
       </div>
 
-      {/* Active Users card — admin only */}
-      {user?.is_admin && (
-        <div
-          onClick={() => { setShowActiveUsers(true); refetchLogs() }}
-          className="cursor-pointer rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/8 to-emerald-600/3 p-5 hover:border-emerald-400/40 hover:shadow-lg transition-all">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15">
-                <UserCheck className="h-5 w-5 text-emerald-400" />
-              </div>
-              <div>
-                <p className="font-semibold text-white">Active Users</p>
-                <p className="text-xs text-slate-500 mt-0.5">Click to see who&apos;s currently logged in &amp; history</p>
+      {/* Active Users + User Passwords — side by side (admin/super-admin only) */}
+      {(user?.is_admin || isSuperAdmin) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Active Users card */}
+          {user?.is_admin && (
+            <div
+              onClick={() => { setShowActiveUsers(true); refetchLogs() }}
+              className="cursor-pointer rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/8 to-emerald-600/3 p-5 hover:border-emerald-400/40 hover:shadow-lg transition-all">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15">
+                    <UserCheck className="h-5 w-5 text-emerald-400" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-white">Active Users</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Click to see who&apos;s online &amp; history</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-2xl font-bold text-emerald-400">{currentlyOnline.length > 0 ? currentlyOnline.length : '—'}</p>
+                  <p className="text-xs text-slate-600">online now</p>
+                </div>
               </div>
             </div>
-            <div className="text-right">
-              <p className="text-2xl font-bold text-emerald-400">{currentlyOnline.length > 0 ? currentlyOnline.length : '—'}</p>
-              <p className="text-xs text-slate-600">online now</p>
-            </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* Super Admin — View Passwords card */}
-      {isSuperAdmin && (
-        <div
-          onClick={() => setShowPasswordsModal(true)}
-          className="cursor-pointer rounded-2xl border border-yellow-500/20 bg-gradient-to-br from-yellow-500/8 to-yellow-600/3 p-5 hover:border-yellow-400/40 hover:shadow-lg transition-all">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-500/15">
-              <Key className="h-5 w-5 text-yellow-400" />
+          {/* User Passwords card */}
+          {isSuperAdmin && (
+            <div
+              onClick={() => setShowPasswordsModal(true)}
+              className="cursor-pointer rounded-2xl border border-yellow-500/20 bg-gradient-to-br from-yellow-500/8 to-yellow-600/3 p-5 hover:border-yellow-400/40 hover:shadow-lg transition-all">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-500/15">
+                  <Key className="h-5 w-5 text-yellow-400" />
+                </div>
+                <div>
+                  <p className="font-semibold text-white">User Passwords</p>
+                  <p className="text-xs text-slate-500">Super admin only — view stored credentials</p>
+                </div>
+              </div>
             </div>
-            <div>
-              <p className="font-semibold text-white">User Passwords</p>
-              <p className="text-xs text-slate-500">Super admin only — view &amp; manage stored credentials</p>
-            </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -266,89 +271,94 @@ export default function DashboardHome() {
         </div>
       </div>
 
-      {/* YouTube Activity Feed — only if user has YouTube permission */}
-      {canSeeYoutube && (
-        <div className="rounded-2xl border border-white/5 bg-white/2 p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Youtube className="h-4 w-4 text-red-400" />
-            <h3 className="text-sm font-medium text-white">YouTube Activity</h3>
-            <span className="ml-auto text-xs text-slate-600">Last 50 events · auto-refreshes</span>
-          </div>
-          {youtubeActivity.length === 0 ? (
-            <p className="text-sm text-slate-600 text-center py-6">No YouTube activity yet.</p>
-          ) : (
-            <div className="space-y-1">
-              {youtubeActivity.slice(0, 12).map(log => {
-                const toIcon = log.to_status ? STATUS_ICON[log.to_status] : null
-                const ToIcon = toIcon
-                return (
-                  <div key={log.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-white/3 transition-all">
-                    <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
-                      log.action === 'deleted' ? 'bg-red-500/10' :
-                      log.action === 'created' ? 'bg-emerald-500/10' : 'bg-blue-500/10'
-                    }`}>
-                      {log.action === 'deleted' ? <Trash2 className="h-3.5 w-3.5 text-red-400" /> :
-                       log.action === 'created' ? <FileText className="h-3.5 w-3.5 text-emerald-400" /> :
-                       <ChevronRight className="h-3.5 w-3.5 text-blue-400" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <span className="text-sm text-slate-300 truncate font-medium">{log.video_title}</span>
-                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                        <span className={`text-xs font-medium ${ACTION_COLOR[log.action] || 'text-slate-500'}`}>{log.action}</span>
-                        {log.from_status && log.to_status && (
-                          <>
-                            <span className={`text-[10px] font-medium ${STATUS_COLOR[log.from_status] || 'text-slate-500'}`}>{log.from_status.replace('_', ' ')}</span>
-                            <ChevronRight className="h-2.5 w-2.5 text-slate-600" />
-                            {ToIcon && <ToIcon className={`h-3 w-3 ${STATUS_COLOR[log.to_status] || 'text-slate-500'}`} />}
-                            <span className={`text-[10px] font-medium ${STATUS_COLOR[log.to_status] || 'text-slate-500'}`}>{log.to_status.replace('_', ' ')}</span>
-                          </>
-                        )}
-                        {log.done_by_name && <span className="text-[10px] text-slate-600">by {log.done_by_name}</span>}
+      {/* YouTube Activity + Bot Activity — side by side */}
+      {(canSeeYoutube || canSeeBots) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* YouTube Activity */}
+          {canSeeYoutube && (
+            <div className="rounded-2xl border border-white/5 bg-white/2 p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Youtube className="h-4 w-4 text-red-400" />
+                <h3 className="text-sm font-medium text-white">YouTube Activity</h3>
+                <span className="ml-auto text-xs text-slate-600">auto-refreshes</span>
+              </div>
+              {youtubeActivity.length === 0 ? (
+                <p className="text-sm text-slate-600 text-center py-6">No YouTube activity yet.</p>
+              ) : (
+                <div className="space-y-1">
+                  {youtubeActivity.slice(0, 12).map(log => {
+                    const toIcon = log.to_status ? STATUS_ICON[log.to_status] : null
+                    const ToIcon = toIcon
+                    return (
+                      <div key={log.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-white/3 transition-all">
+                        <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
+                          log.action === 'deleted' ? 'bg-red-500/10' :
+                          log.action === 'created' ? 'bg-emerald-500/10' : 'bg-blue-500/10'
+                        }`}>
+                          {log.action === 'deleted' ? <Trash2 className="h-3.5 w-3.5 text-red-400" /> :
+                           log.action === 'created' ? <FileText className="h-3.5 w-3.5 text-emerald-400" /> :
+                           <ChevronRight className="h-3.5 w-3.5 text-blue-400" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-slate-300 truncate font-medium">{log.video_title}</p>
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                            <span className={`text-xs font-medium ${ACTION_COLOR[log.action] || 'text-slate-500'}`}>{log.action}</span>
+                            {log.from_status && log.to_status && (
+                              <>
+                                <span className={`text-[10px] font-medium ${STATUS_COLOR[log.from_status] || 'text-slate-500'}`}>{log.from_status.replace('_', ' ')}</span>
+                                <ChevronRight className="h-2.5 w-2.5 text-slate-600" />
+                                {ToIcon && <ToIcon className={`h-3 w-3 ${STATUS_COLOR[log.to_status] || 'text-slate-500'}`} />}
+                                <span className={`text-[10px] font-medium ${STATUS_COLOR[log.to_status] || 'text-slate-500'}`}>{log.to_status.replace('_', ' ')}</span>
+                              </>
+                            )}
+                            {log.done_by_name && <span className="text-[10px] text-slate-600">by {log.done_by_name}</span>}
+                          </div>
+                        </div>
+                        <span className="text-[10px] text-slate-600 shrink-0">{timeAgo(log.created_at)}</span>
                       </div>
-                    </div>
-                    <span className="text-[10px] text-slate-600 shrink-0">{timeAgo(log.created_at)}</span>
-                  </div>
-                )
-              })}
+                    )
+                  })}
+                </div>
+              )}
             </div>
           )}
-        </div>
-      )}
 
-      {/* Bot Activity Feed — only if user has Bot permission */}
-      {canSeeBots && (
-        <div className="rounded-2xl border border-white/5 bg-white/2 p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Bot className="h-4 w-4 text-blue-400" />
-            <h3 className="text-sm font-medium text-white">Bot Activity</h3>
-            <span className="ml-auto text-xs text-slate-600">Last 50 events · auto-refreshes</span>
-          </div>
-          {botActivity.length === 0 ? (
-            <p className="text-sm text-slate-600 text-center py-6">No bot activity yet.</p>
-          ) : (
-            <div className="space-y-1">
-              {botActivity.slice(0, 12).map(log => (
-                <div key={log.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-white/3 transition-all">
-                  <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
-                    log.action === 'deleted' ? 'bg-red-500/10' :
-                    log.action === 'created' ? 'bg-emerald-500/10' : 'bg-blue-500/10'
-                  }`}>
-                    <Bot className={`h-3.5 w-3.5 ${
-                      log.action === 'deleted' ? 'text-red-400' :
-                      log.action === 'created' ? 'text-emerald-400' : 'text-blue-400'
-                    }`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="text-sm text-slate-300 truncate font-medium">{log.bot_name || 'Bot'}</span>
-                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                      <span className={`text-xs font-medium ${ACTION_COLOR[log.action] || 'text-slate-500'}`}>{log.action}</span>
-                      {log.detail && <span className="text-[10px] text-slate-500">{log.detail}</span>}
-                      {log.done_by_name && <span className="text-[10px] text-slate-600">by {log.done_by_name}</span>}
+          {/* Bot Activity */}
+          {canSeeBots && (
+            <div className="rounded-2xl border border-white/5 bg-white/2 p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Bot className="h-4 w-4 text-blue-400" />
+                <h3 className="text-sm font-medium text-white">Bot Activity</h3>
+                <span className="ml-auto text-xs text-slate-600">auto-refreshes</span>
+              </div>
+              {botActivity.length === 0 ? (
+                <p className="text-sm text-slate-600 text-center py-6">No bot activity yet.</p>
+              ) : (
+                <div className="space-y-1">
+                  {botActivity.slice(0, 12).map(log => (
+                    <div key={log.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-white/3 transition-all">
+                      <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
+                        log.action === 'deleted' ? 'bg-red-500/10' :
+                        log.action === 'created' ? 'bg-emerald-500/10' : 'bg-blue-500/10'
+                      }`}>
+                        <Bot className={`h-3.5 w-3.5 ${
+                          log.action === 'deleted' ? 'text-red-400' :
+                          log.action === 'created' ? 'text-emerald-400' : 'text-blue-400'
+                        }`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-slate-300 truncate font-medium">{log.bot_name || 'Bot'}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                          <span className={`text-xs font-medium ${ACTION_COLOR[log.action] || 'text-slate-500'}`}>{log.action}</span>
+                          {log.detail && <span className="text-[10px] text-slate-500">{log.detail}</span>}
+                          {log.done_by_name && <span className="text-[10px] text-slate-600">by {log.done_by_name}</span>}
+                        </div>
+                      </div>
+                      <span className="text-[10px] text-slate-600 shrink-0">{timeAgo(log.created_at)}</span>
                     </div>
-                  </div>
-                  <span className="text-[10px] text-slate-600 shrink-0">{timeAgo(log.created_at)}</span>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
           )}
         </div>
@@ -372,7 +382,6 @@ export default function DashboardHome() {
             </div>
 
             <div className="max-h-[70vh] overflow-y-auto p-6 space-y-5">
-              {/* Currently Online */}
               <div>
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-emerald-400 mb-3">Currently Online</h3>
                 {currentlyOnline.length === 0 ? (
@@ -401,7 +410,6 @@ export default function DashboardHome() {
                 )}
               </div>
 
-              {/* Login History */}
               <div>
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">Login History</h3>
                 {loginHistory.length === 0 ? (
