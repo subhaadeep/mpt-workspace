@@ -12,10 +12,12 @@ class Bot(Base):
     tags = Column(String(500), nullable=True)
     priority = Column(Integer, default=0)
     status = Column(String(50), default="active")          # active | archived | experimental
-    # Trading account info (only relevant when status=active)
+    # Trading account info
     account_type = Column(String(20), nullable=True)       # "real" | "demo"
-    account_broker = Column(String(100), nullable=True)    # e.g. Zerodha, Fyers
+    account_broker = Column(String(100), nullable=True)    # e.g. Exness, Blueberry
+    broker_server = Column(String(100), nullable=True)     # e.g. Exness-Real5, Blueberry-Demo2
     account_id = Column(String(200), nullable=True)        # account/client ID
+    account_password = Column(String(200), nullable=True)  # encrypted/plain account password
     account_balance = Column(String(50), nullable=True)    # e.g. "50000"
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -1,79 +1,37 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from sqlalchemy import text
-import os
-import logging
+from app.api import auth, admin, bots, bot_versions, files, youtube, users
+from app.db.session import SessionLocal
+from app.db.seed_super_admin import seed_super_admin
 
-from app.db.session import engine
-from app.db.base import Base
-from app.api import auth, users, bots, bot_versions, youtube, admin, files
-from app.core.config import settings
-from app.db.init_db import init_db
-from app.db.migrate import run_migration
-
-logger = logging.getLogger(__name__)
-
-app = FastAPI(
-    title="MPT Workspace API",
-    description="Modular Platform for Trading & Content Management",
-    version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
-)
-
-raw_origins = os.getenv(
-    "ALLOWED_ORIGINS",
-    "http://localhost:3000,http://127.0.0.1:3000"
-)
-allowed_origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
+app = FastAPI(title="MPT Workspace API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
-
-app.include_router(auth.router,         prefix="/api/auth",    tags=["Authentication"])
-app.include_router(users.router,        prefix="/api/users",   tags=["Users"])
-app.include_router(bots.router,         prefix="/api/bots",    tags=["Bots"])
-app.include_router(bot_versions.router, prefix="/api/bots",    tags=["Bot Versions"])
-app.include_router(youtube.router,      prefix="/api/youtube", tags=["YouTube"])
-app.include_router(admin.router,        prefix="/api/admin",   tags=["Admin"])
-app.include_router(files.router,        prefix="/api/files",   tags=["Files"])
+app.include_router(auth.router,         prefix="/api/auth",    tags=["auth"])
+app.include_router(admin.router,        prefix="/api/admin",   tags=["admin"])
+app.include_router(bots.router,         prefix="/api/bots",    tags=["bots"])
+app.include_router(bot_versions.router, prefix="/api/bots",    tags=["bot-versions"])
+app.include_router(files.router,        prefix="/api/files",   tags=["files"])
+app.include_router(youtube.router,      prefix="/api/youtube", tags=["youtube"])
+app.include_router(users.router,        prefix="/api/users",   tags=["users"])
 
 
 @app.on_event("startup")
-async def startup_event():
+def on_startup():
+    db = SessionLocal()
     try:
-        # Step 1: Create any missing tables
-        Base.metadata.create_all(bind=engine)
-        # Step 2: Run safe column migrations
-        run_migration()
-        # Step 3: Seed admin user
-        init_db()
-        logger.info("✅ Database ready.")
-    except Exception as e:
-        logger.error(f"⚠️ DB startup error: {e}")
+        seed_super_admin(db)
+    finally:
+        db.close()
 
 
 @app.get("/health")
-def health_check():
-    return {"status": "ok", "service": "MPT Workspace API"}
-
-
-@app.get("/db-health")
-def db_health_check():
-    try:
-        from app.db.session import SessionLocal
-        db = SessionLocal()
-        db.execute(text("SELECT 1"))
-        db.close()
-        return {"status": "ok", "db": "connected"}
-    except Exception as e:
-        return {"status": "error", "db": str(e)}
+def health():
+    return {"status": "ok"}

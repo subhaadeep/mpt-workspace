@@ -19,13 +19,18 @@ class UserUpdate(BaseModel):
     can_access_bots: Optional[bool] = None
     can_access_youtube: Optional[bool] = None
     is_active: Optional[bool] = None
-    is_admin: Optional[bool] = None   # ← NEW: allow toggling admin
+    is_admin: Optional[bool] = None
+
+
+class TransferSuperAdmin(BaseModel):
+    new_super_admin_id: int  # must be an existing admin
 
 
 class UserOut(UserBase):
     id: int
     is_active: bool
     is_admin: bool
+    is_super_admin: bool
     created_at: datetime
 
     class Config:

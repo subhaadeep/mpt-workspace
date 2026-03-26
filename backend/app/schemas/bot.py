@@ -11,7 +11,9 @@ class BotCreate(BaseModel):
     status: Optional[str] = "active"
     account_type: Optional[str] = None
     account_broker: Optional[str] = None
+    broker_server: Optional[str] = None
     account_id: Optional[str] = None
+    account_password: Optional[str] = None
     account_balance: Optional[str] = None
 
 
@@ -23,7 +25,9 @@ class BotUpdate(BaseModel):
     status: Optional[str] = None
     account_type: Optional[str] = None
     account_broker: Optional[str] = None
+    broker_server: Optional[str] = None
     account_id: Optional[str] = None
+    account_password: Optional[str] = None
     account_balance: Optional[str] = None
 
 
@@ -36,7 +40,9 @@ class BotOut(BaseModel):
     status: str
     account_type: Optional[str] = None
     account_broker: Optional[str] = None
+    broker_server: Optional[str] = None
     account_id: Optional[str] = None
+    account_password: Optional[str] = None
     account_balance: Optional[str] = None
     created_by: int
     created_at: datetime
