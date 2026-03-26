@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import auth, admin, bots, bot_versions, files, youtube, users
 from app.db.session import SessionLocal
 from app.db.seed_super_admin import seed_super_admin
+import app.db.all_models  # noqa — ensures all models are registered with SQLAlchemy
 
 app = FastAPI(title="MPT Workspace API")
 
