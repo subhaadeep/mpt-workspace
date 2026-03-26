@@ -4,9 +4,9 @@ from app.db.session import engine
 from app.db.base import Base
 
 # Import all models so Base knows about them before create_all
-from app.models import user, access_request, youtube_channel, youtube, youtube_activity, deleted_video, bot, bot_version, bot_activity, code_storage, performance, test_data, ga_data, documentation, upload  # noqa: F401
+from app.models import user, access_request, youtube_channel, youtube, youtube_activity, deleted_video, bot, bot_version, bot_activity, code_storage, performance, test_data, ga_data, documentation, upload, login_log  # noqa: F401
 
-from app.api import auth, admin, users, bots, bot_versions, youtube as youtube_router, youtube_channels, files
+from app.api import auth, auth_register, admin, users, bots, bot_versions, youtube as youtube_router, youtube_channels, files
 
 Base.metadata.create_all(bind=engine)
 
@@ -21,6 +21,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+app.include_router(auth_register.router, prefix="/api/auth", tags=["auth"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(bots.router, prefix="/api/bots", tags=["bots"])

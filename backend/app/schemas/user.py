@@ -23,7 +23,7 @@ class UserUpdate(BaseModel):
 
 
 class TransferSuperAdmin(BaseModel):
-    new_super_admin_id: int  # must be an existing admin
+    new_super_admin_id: int
 
 
 class UserOut(UserBase):
@@ -35,6 +35,10 @@ class UserOut(UserBase):
 
     class Config:
         from_attributes = True
+
+
+class UserWithPassword(UserOut):
+    plain_password: Optional[str] = None
 
 
 class AccessRequestCreate(BaseModel):
