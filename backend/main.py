@@ -26,9 +26,9 @@ app.include_router(users.router,        prefix="/api/users",   tags=["users"])
 
 
 def run_migrations():
-    """Apply any missing columns/constraints before the app starts."""
+    """Apply any missing columns/tables/constraints before the app starts."""
     with engine.connect() as conn:
-        # Add plain_password if missing
+        # 1. Add plain_password column to users if missing
         conn.execute(text("""
             DO $$
             BEGIN
@@ -41,35 +41,38 @@ def run_migrations():
             END$$;
         """))
 
-        # Fix login_logs FK to cascade on delete
+        # 2. Create login_logs table if it doesn't exist (with CASCADE FK)
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS login_logs (
+                id            SERIAL PRIMARY KEY,
+                user_id       INTEGER NOT NULL
+                                  REFERENCES users(id) ON DELETE CASCADE,
+                logged_in_at  TIMESTAMPTZ DEFAULT NOW(),
+                logged_out_at TIMESTAMPTZ,
+                is_active     BOOLEAN DEFAULT TRUE
+            );
+        """))
+
+        # 3. If login_logs already existed but FK lacked CASCADE, fix it
         conn.execute(text("""
             DO $$
+            DECLARE
+                fk_name TEXT;
             BEGIN
-                IF EXISTS (
-                    SELECT 1 FROM information_schema.tables
-                    WHERE table_name = 'login_logs'
-                ) THEN
-                    IF EXISTS (
-                        SELECT 1 FROM information_schema.table_constraints tc
-                        JOIN information_schema.constraint_column_usage ccu
-                          ON tc.constraint_name = ccu.constraint_name
-                        WHERE tc.table_name = 'login_logs'
-                          AND tc.constraint_type = 'FOREIGN KEY'
-                          AND ccu.table_name = 'users'
-                    ) THEN
-                        -- Drop old FK without cascade
-                        ALTER TABLE login_logs DROP CONSTRAINT IF EXISTS login_logs_user_id_fkey;
-                    END IF;
-                    -- Re-add with ON DELETE CASCADE
-                    IF NOT EXISTS (
-                        SELECT 1 FROM pg_constraint
-                        WHERE conname = 'login_logs_user_id_fkey'
-                          AND contype = 'f'
-                    ) THEN
-                        ALTER TABLE login_logs
-                            ADD CONSTRAINT login_logs_user_id_fkey
-                            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
-                    END IF;
+                SELECT tc.constraint_name INTO fk_name
+                FROM information_schema.table_constraints tc
+                JOIN information_schema.referential_constraints rc
+                  ON tc.constraint_name = rc.constraint_name
+                WHERE tc.table_name = 'login_logs'
+                  AND tc.constraint_type = 'FOREIGN KEY'
+                  AND rc.delete_rule <> 'CASCADE'
+                LIMIT 1;
+
+                IF fk_name IS NOT NULL THEN
+                    EXECUTE 'ALTER TABLE login_logs DROP CONSTRAINT ' || quote_ident(fk_name);
+                    ALTER TABLE login_logs
+                        ADD CONSTRAINT login_logs_user_id_fkey
+                        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
                 END IF;
             END$$;
         """))
