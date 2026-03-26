@@ -9,7 +9,6 @@ import {
 } from 'lucide-react'
 import api from '@/lib/api'
 import { useUIStore } from '@/store/uiStore'
-import DashboardShell from '@/components/layout/DashboardShell'
 import { Badge } from '@/components/ui/Badge'
 import { Spinner } from '@/components/ui/Spinner'
 
@@ -105,125 +104,119 @@ export default function BotDetailPage() {
   const statusVariant = (s: string) => s === 'active' ? 'success' : s === 'experimental' ? 'warning' : 'default'
 
   if (loading) return (
-    <DashboardShell>
-      <div className="flex justify-center py-20"><Spinner size="lg" /></div>
-    </DashboardShell>
+    <div className="flex justify-center py-20"><Spinner size="lg" /></div>
   )
   if (!bot) return (
-    <DashboardShell>
-      <div className="py-20 text-center text-slate-500">Bot not found</div>
-    </DashboardShell>
+    <div className="py-20 text-center text-slate-500">Bot not found</div>
   )
 
   return (
-    <DashboardShell>
-      <div className="max-w-5xl mx-auto space-y-5">
-        {/* Breadcrumb */}
-        <button onClick={() => router.push('/dashboard/bots')} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-300 transition-colors">
-          <ChevronLeft className="h-4 w-4" /> Back to Bots
-        </button>
+    <div className="max-w-5xl mx-auto space-y-5">
+      {/* Breadcrumb */}
+      <button onClick={() => router.push('/dashboard/bots')} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-300 transition-colors">
+        <ChevronLeft className="h-4 w-4" /> Back to Bots
+      </button>
 
-        {/* Bot header */}
-        <div className="rounded-2xl border border-white/5 bg-white/2 p-5">
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <h1 className="text-2xl font-bold text-white">{bot.name}</h1>
-                <Badge variant={statusVariant(bot.status)}>{bot.status}</Badge>
+      {/* Bot header */}
+      <div className="rounded-2xl border border-white/5 bg-white/2 p-5">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h1 className="text-2xl font-bold text-white">{bot.name}</h1>
+              <Badge variant={statusVariant(bot.status)}>{bot.status}</Badge>
+            </div>
+            {bot.description && <p className="mt-1 text-sm text-slate-500">{bot.description}</p>}
+            {bot.tags && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {bot.tags.split(',').map(t => t.trim()).filter(Boolean).map(tag => (
+                  <span key={tag} className="rounded-full border border-white/8 bg-white/4 px-2.5 py-0.5 text-xs text-slate-400">{tag}</span>
+                ))}
               </div>
-              {bot.description && <p className="mt-1 text-sm text-slate-500">{bot.description}</p>}
-              {bot.tags && (
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {bot.tags.split(',').map(t => t.trim()).filter(Boolean).map(tag => (
-                    <span key={tag} className="rounded-full border border-white/8 bg-white/4 px-2.5 py-0.5 text-xs text-slate-400">{tag}</span>
-                  ))}
-                </div>
-              )}
-            </div>
+            )}
           </div>
         </div>
+      </div>
 
-        {/* Version selector row */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Version</span>
-            <div className="relative">
-              <select
-                value={selectedVersionId ?? ''}
-                onChange={e => setSelectedVersionId(Number(e.target.value))}
-                className="appearance-none rounded-xl border border-white/8 bg-[#0d1424] pl-3 pr-8 py-2 text-sm font-medium text-white outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20"
-              >
-                {versions.length === 0 && <option value="">No versions</option>}
-                {versions.map(v => <option key={v.id} value={v.id}>{v.version_name}</option>)}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-2 top-2.5 h-4 w-4 text-slate-500" />
-            </div>
-          </div>
-
-          {showNewVersion ? (
-            <div className="flex items-center gap-2">
-              <input
-                autoFocus
-                placeholder="e.g. v2.0"
-                value={newVersionName}
-                onChange={e => setNewVersionName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && createVersion()}
-                className="rounded-xl border border-white/8 bg-white/4 px-3 py-2 text-sm text-white placeholder-slate-600 outline-none focus:border-blue-500/60"
-              />
-              <button onClick={createVersion} className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-500">Add</button>
-              <button onClick={() => setShowNewVersion(false)} className="rounded-xl border border-white/8 px-3 py-2 text-sm text-slate-400 hover:bg-white/5">Cancel</button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setShowNewVersion(true)}
-              className="flex items-center gap-1.5 rounded-xl border border-dashed border-white/15 px-3 py-2 text-sm text-slate-500 hover:border-blue-500/40 hover:text-blue-400 transition-all"
+      {/* Version selector row */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Version</span>
+          <div className="relative">
+            <select
+              value={selectedVersionId ?? ''}
+              onChange={e => setSelectedVersionId(Number(e.target.value))}
+              className="appearance-none rounded-xl border border-white/8 bg-[#0d1424] pl-3 pr-8 py-2 text-sm font-medium text-white outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20"
             >
-              <Plus className="h-3.5 w-3.5" /> New Version
-            </button>
-          )}
+              {versions.length === 0 && <option value="">No versions</option>}
+              {versions.map(v => <option key={v.id} value={v.id}>{v.version_name}</option>)}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2 top-2.5 h-4 w-4 text-slate-500" />
+          </div>
         </div>
 
-        {selectedVersion ? (
-          <>
-            {/* Tab bar */}
-            <div className="flex gap-0.5 overflow-x-auto border-b border-white/5 pb-0">
-              {TABS.map(tab => {
-                const Icon = tab.icon
-                return (
-                  <button
-                    key={tab.key}
-                    onClick={() => setActiveTab(tab.key)}
-                    className={`flex shrink-0 items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${
-                      activeTab === tab.key
-                        ? 'border-blue-500 text-blue-400'
-                        : 'border-transparent text-slate-500 hover:text-slate-300'
-                    }`}
-                  >
-                    <Icon className="h-3.5 w-3.5" />{tab.label}
-                  </button>
-                )
-              })}
-            </div>
-
-            {/* Tab content */}
-            <div className="rounded-2xl border border-white/5 bg-white/2 p-5 min-h-[300px]">
-              {activeTab === 'overview'    && <OverviewTab    version={selectedVersion} onSave={saveVersionField} />}
-              {activeTab === 'inputs'      && <InputsTab      version={selectedVersion} onSave={saveVersionField} />}
-              {activeTab === 'features'    && <FeaturesTab    version={selectedVersion} onSave={saveVersionField} />}
-              {activeTab === 'screenshots' && <ScreenshotsTab version={selectedVersion} onSave={saveVersionField} />}
-              {activeTab === 'ga'          && <GATab botId={botId} versionId={selectedVersionId!} gaRuns={gaRuns} reload={() => loadVersionDetails(selectedVersionId!)} addToast={addToast} />}
-              {activeTab === 'code'        && <CodeTab botId={botId} versionId={selectedVersionId!} codeEntries={codeEntries} reload={() => loadVersionDetails(selectedVersionId!)} addToast={addToast} />}
-              {activeTab === 'extra'       && <ExtraTab version={selectedVersion} onSave={saveVersionField} />}
-            </div>
-          </>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-20 rounded-2xl border border-dashed border-white/8">
-            <p className="text-slate-500">No versions yet.</p>
-            <button onClick={() => setShowNewVersion(true)} className="mt-3 text-sm text-blue-400 hover:underline">Create first version</button>
+        {showNewVersion ? (
+          <div className="flex items-center gap-2">
+            <input
+              autoFocus
+              placeholder="e.g. v2.0"
+              value={newVersionName}
+              onChange={e => setNewVersionName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && createVersion()}
+              className="rounded-xl border border-white/8 bg-white/4 px-3 py-2 text-sm text-white placeholder-slate-600 outline-none focus:border-blue-500/60"
+            />
+            <button onClick={createVersion} className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-500">Add</button>
+            <button onClick={() => setShowNewVersion(false)} className="rounded-xl border border-white/8 px-3 py-2 text-sm text-slate-400 hover:bg-white/5">Cancel</button>
           </div>
+        ) : (
+          <button
+            onClick={() => setShowNewVersion(true)}
+            className="flex items-center gap-1.5 rounded-xl border border-dashed border-white/15 px-3 py-2 text-sm text-slate-500 hover:border-blue-500/40 hover:text-blue-400 transition-all"
+          >
+            <Plus className="h-3.5 w-3.5" /> New Version
+          </button>
         )}
       </div>
-    </DashboardShell>
+
+      {selectedVersion ? (
+        <>
+          {/* Tab bar */}
+          <div className="flex gap-0.5 overflow-x-auto border-b border-white/5 pb-0">
+            {TABS.map(tab => {
+              const Icon = tab.icon
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`flex shrink-0 items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-all ${
+                    activeTab === tab.key
+                      ? 'border-blue-500 text-blue-400'
+                      : 'border-transparent text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />{tab.label}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Tab content */}
+          <div className="rounded-2xl border border-white/5 bg-white/2 p-5 min-h-[300px]">
+            {activeTab === 'overview'    && <OverviewTab    version={selectedVersion} onSave={saveVersionField} />}
+            {activeTab === 'inputs'      && <InputsTab      version={selectedVersion} onSave={saveVersionField} />}
+            {activeTab === 'features'    && <FeaturesTab    version={selectedVersion} onSave={saveVersionField} />}
+            {activeTab === 'screenshots' && <ScreenshotsTab version={selectedVersion} onSave={saveVersionField} />}
+            {activeTab === 'ga'          && <GATab botId={botId} versionId={selectedVersionId!} gaRuns={gaRuns} reload={() => loadVersionDetails(selectedVersionId!)} addToast={addToast} />}
+            {activeTab === 'code'        && <CodeTab botId={botId} versionId={selectedVersionId!} codeEntries={codeEntries} reload={() => loadVersionDetails(selectedVersionId!)} addToast={addToast} />}
+            {activeTab === 'extra'       && <ExtraTab version={selectedVersion} onSave={saveVersionField} />}
+          </div>
+        </>
+      ) : (
+        <div className="flex flex-col items-center justify-center py-20 rounded-2xl border border-dashed border-white/8">
+          <p className="text-slate-500">No versions yet.</p>
+          <button onClick={() => setShowNewVersion(true)} className="mt-3 text-sm text-blue-400 hover:underline">Create first version</button>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -315,7 +308,6 @@ function FeaturesTab({ version, onSave }: { version: Version; onSave: (f: string
 
   return (
     <div className="grid gap-5 md:grid-cols-2">
-      {/* Implemented */}
       <div className="space-y-3">
         <h3 className="flex items-center gap-2 font-semibold text-emerald-400"><CheckCircle2 className="h-4 w-4" /> Implemented</h3>
         <div className="space-y-1.5">
@@ -336,7 +328,6 @@ function FeaturesTab({ version, onSave }: { version: Version; onSave: (f: string
         </div>
       </div>
 
-      {/* Planned */}
       <div className="space-y-3">
         <h3 className="flex items-center gap-2 font-semibold text-amber-400"><Clock className="h-4 w-4" /> Planned Changes</h3>
         <div className="space-y-1.5">
@@ -515,7 +506,7 @@ function GATab({ botId, versionId, gaRuns, reload, addToast }: {
   )
 }
 
-// ─── CODE TAB (with 1-tap copy) ───────────────────────
+// ─── CODE TAB ─────────────────────────────────────────
 function CopyButton({ code }: { code: string }) {
   const [copied, setCopied] = useState(false)
   async function copy() {
@@ -591,10 +582,8 @@ function CodeTab({ botId, versionId, codeEntries, reload, addToast }: {
       <div className="space-y-4">
         {codeEntries.map(entry => (
           <div key={entry.id} className="rounded-2xl border border-white/8 overflow-hidden">
-            {/* Code header bar */}
             <div className="flex items-center justify-between bg-[#0d1424] border-b border-white/8 px-4 py-2.5">
               <div className="flex items-center gap-2.5">
-                {/* Traffic lights */}
                 <div className="flex gap-1.5">
                   <div className="h-3 w-3 rounded-full bg-red-500/60" />
                   <div className="h-3 w-3 rounded-full bg-amber-500/60" />
