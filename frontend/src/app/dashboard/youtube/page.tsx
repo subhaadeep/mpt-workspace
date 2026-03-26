@@ -4,25 +4,15 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Plus, X, ChevronRight, Trash2, ExternalLink,
-  FileText, Film, Scissors, Image, Upload, Tag
+  FileText, Film, Scissors, Image, Upload, Tag, Youtube
 } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
-import { Textarea } from '@/components/ui/Textarea'
-import { Modal } from '@/components/ui/Modal'
 import { Spinner } from '@/components/ui/Spinner'
 import { useUIStore } from '@/store/uiStore'
 import api from '@/lib/api'
 import { formatDate } from '@/lib/utils'
-import {
-  VIDEO_STATUSES,
-  STATUS_LABELS,
-  STATUS_COLORS,
-  STATUS_NEXT,
-  type VideoStatus,
-} from '@/lib/constants'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+type VideoStatus = 'script' | 'raw_files' | 'editing' | 'thumbnail' | 'uploaded'
+
 type Video = {
   id: number
   title: string
@@ -31,205 +21,147 @@ type Video = {
   status: VideoStatus
   tags?: string
   youtube_url?: string
-  scheduled_date?: string
-  uploaded_date?: string
   created_at: string
-  updated_at?: string
 }
 
-// ─── Stage icons ──────────────────────────────────────────────────────────────
-const STAGE_ICONS: Record<VideoStatus, React.ElementType> = {
-  script:    FileText,
-  raw_files: Film,
-  editing:   Scissors,
-  thumbnail: Image,
-  uploaded:  Upload,
+const STAGES: { key: VideoStatus; label: string; icon: React.ElementType; color: string; bg: string; border: string; dot: string }[] = [
+  { key: 'script',    label: 'Script',    icon: FileText, color: 'text-violet-400', bg: 'bg-violet-500/10',  border: 'border-violet-500/25', dot: 'bg-violet-400' },
+  { key: 'raw_files', label: 'Raw Files', icon: Film,     color: 'text-blue-400',   bg: 'bg-blue-500/10',    border: 'border-blue-500/25',   dot: 'bg-blue-400' },
+  { key: 'editing',   label: 'Editing',   icon: Scissors, color: 'text-amber-400',  bg: 'bg-amber-500/10',   border: 'border-amber-500/25',  dot: 'bg-amber-400' },
+  { key: 'thumbnail', label: 'Thumbnail', icon: Image,    color: 'text-pink-400',   bg: 'bg-pink-500/10',    border: 'border-pink-500/25',   dot: 'bg-pink-400' },
+  { key: 'uploaded',  label: 'Uploaded',  icon: Upload,   color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/25', dot: 'bg-emerald-400' },
+]
+
+const NEXT_STATUS: Record<VideoStatus, VideoStatus | null> = {
+  script: 'raw_files', raw_files: 'editing', editing: 'thumbnail', thumbnail: 'uploaded', uploaded: null
 }
 
-// ─── Status pill ──────────────────────────────────────────────────────────────
 function StatusPill({ status }: { status: VideoStatus }) {
-  const c = STATUS_COLORS[status]
+  const s = STAGES.find(x => x.key === status)!
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium border ${c.bg} ${c.text} ${c.border}`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${c.dot}`} />
-      {STATUS_LABELS[status]}
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium border ${s.bg} ${s.color} ${s.border}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
+      {s.label}
     </span>
   )
 }
 
-// ─── Video detail drawer ───────────────────────────────────────────────────────
-function VideoDrawer({
-  video,
-  onClose,
-}: {
-  video: Video
-  onClose: () => void
-}) {
+function VideoDrawer({ video, onClose }: { video: Video; onClose: () => void }) {
   const qc = useQueryClient()
-  const addToast = useUIStore((s) => s.addToast)
-  const [script, setScript] = useState(video.script || '')
+  const addToast = useUIStore(s => s.addToast)
   const [title, setTitle] = useState(video.title)
   const [desc, setDesc] = useState(video.idea_description || '')
+  const [script, setScript] = useState(video.script || '')
   const [tags, setTags] = useState(video.tags || '')
   const [ytUrl, setYtUrl] = useState(video.youtube_url || '')
   const [tab, setTab] = useState<'info' | 'script'>('info')
 
   const update = useMutation({
-    mutationFn: (payload: Partial<Video>) =>
-      api.patch(`/api/youtube/videos/${video.id}`, payload).then((r) => r.data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['videos'] })
-      addToast('Saved!', 'success')
-    },
+    mutationFn: (payload: Partial<Video>) => api.patch(`/api/youtube/videos/${video.id}`, payload).then(r => r.data),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['videos'] }); addToast('Saved!', 'success') },
     onError: () => addToast('Save failed', 'error'),
   })
 
   const advance = useMutation({
-    mutationFn: (status: VideoStatus) =>
-      api.patch(`/api/youtube/videos/${video.id}`, { status }).then((r) => r.data),
-    onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ['videos'] })
-      addToast(`Moved to ${STATUS_LABELS[data.status]}!`, 'success')
-      onClose()
-    },
+    mutationFn: (status: VideoStatus) => api.patch(`/api/youtube/videos/${video.id}`, { status }).then(r => r.data),
+    onSuccess: (data) => { qc.invalidateQueries({ queryKey: ['videos'] }); addToast(`Moved to ${STAGES.find(s => s.key === data.status)?.label}!`, 'success'); onClose() },
   })
 
   const del = useMutation({
     mutationFn: () => api.delete(`/api/youtube/videos/${video.id}`),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['videos'] })
-      addToast('Deleted', 'info')
-      onClose()
-    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['videos'] }); addToast('Deleted', 'info'); onClose() },
   })
 
-  const nextStatus = STATUS_NEXT[video.status]
-  const StageIcon = STAGE_ICONS[video.status]
+  const nextStatus = NEXT_STATUS[video.status]
+  const nextStage = nextStatus ? STAGES.find(s => s.key === nextStatus) : null
 
   return (
     <div className="fixed inset-0 z-50 flex">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
-
-      {/* Drawer panel */}
-      <div className="relative ml-auto flex h-full w-full max-w-xl flex-col bg-white shadow-2xl">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative ml-auto flex h-full w-full max-w-lg flex-col bg-[#0d1424] border-l border-white/8 shadow-2xl">
         {/* Header */}
-        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-4">
+        <div className="flex items-start justify-between gap-4 border-b border-white/5 px-6 py-4">
           <div className="min-w-0">
             <StatusPill status={video.status} />
-            <h2 className="mt-2 text-lg font-semibold text-slate-900 truncate">{video.title}</h2>
-            <p className="text-xs text-slate-400 mt-0.5">Created {formatDate(video.created_at)}</p>
+            <h2 className="mt-2 text-lg font-semibold text-white truncate">{video.title}</h2>
+            <p className="text-xs text-slate-500 mt-0.5">Created {formatDate(video.created_at)}</p>
           </div>
-          <button onClick={onClose} className="shrink-0 rounded-lg p-2 hover:bg-slate-100">
-            <X className="h-4 w-4 text-slate-500" />
+          <button onClick={onClose} className="shrink-0 rounded-lg p-2 text-slate-500 hover:bg-white/5 hover:text-slate-300">
+            <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-slate-100 px-6">
-          {(['info', 'script'] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
+        <div className="flex border-b border-white/5 px-6">
+          {(['info', 'script'] as const).map(t => (
+            <button key={t} onClick={() => setTab(t)}
               className={`-mb-px border-b-2 px-4 py-3 text-sm font-medium capitalize transition ${
-                tab === t
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-700'
-              }`}
-            >
+                tab === t ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-300'
+              }`}>
               {t === 'info' ? 'Details' : 'Script'}
             </button>
           ))}
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
           {tab === 'info' ? (
             <>
-              <Input label="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
-              <Textarea
-                label="Idea / Description"
-                value={desc}
-                onChange={(e) => setDesc(e.target.value)}
-                rows={3}
-              />
-              <div className="space-y-1">
-                <label className="block text-sm font-medium text-slate-700">
-                  <Tag className="inline h-3.5 w-3.5 mr-1" />Tags (comma-separated)
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">Title</label>
+                <input value={title} onChange={e => setTitle(e.target.value)}
+                  className="w-full rounded-xl border border-white/8 bg-white/4 px-3 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">Idea / Description</label>
+                <textarea value={desc} onChange={e => setDesc(e.target.value)} rows={3}
+                  className="w-full rounded-xl border border-white/8 bg-white/4 px-3 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:border-blue-500/60 resize-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">
+                  <Tag className="inline h-3 w-3 mr-1" />Tags (comma-separated)
                 </label>
-                <input
-                  value={tags}
-                  onChange={(e) => setTags(e.target.value)}
-                  placeholder="shorts, nifty, analysis"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-                />
+                <input value={tags} onChange={e => setTags(e.target.value)} placeholder="shorts, nifty, analysis"
+                  className="w-full rounded-xl border border-white/8 bg-white/4 px-3 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:border-blue-500/60" />
               </div>
               {video.status === 'uploaded' && (
-                <Input
-                  label="YouTube URL"
-                  value={ytUrl}
-                  onChange={(e) => setYtUrl(e.target.value)}
-                  placeholder="https://youtube.com/watch?v=..."
-                />
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1.5">YouTube URL</label>
+                  <input value={ytUrl} onChange={e => setYtUrl(e.target.value)} placeholder="https://youtube.com/watch?v=..."
+                    className="w-full rounded-xl border border-white/8 bg-white/4 px-3 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:border-blue-500/60" />
+                </div>
               )}
             </>
           ) : (
-            <Textarea
-              label="Script / Content"
-              value={script}
-              onChange={(e) => setScript(e.target.value)}
-              rows={18}
-              placeholder="Write your script here..."
-            />
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1.5">Script / Content</label>
+              <textarea value={script} onChange={e => setScript(e.target.value)} rows={20} placeholder="Write your script here..."
+                className="w-full rounded-xl border border-white/8 bg-white/4 px-3 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:border-blue-500/60 resize-none" />
+            </div>
           )}
         </div>
 
-        {/* Footer actions */}
-        <div className="border-t border-slate-100 px-6 py-4 space-y-3">
-          {/* Advance pipeline button */}
-          {nextStatus && (
-            <Button
-              className="w-full"
-              loading={advance.isPending}
-              onClick={() => advance.mutate(nextStatus)}
-            >
-              Move to {STATUS_LABELS[nextStatus]} <ChevronRight className="h-4 w-4" />
-            </Button>
+        {/* Footer */}
+        <div className="border-t border-white/5 px-6 py-4 space-y-2">
+          {nextStage && (
+            <button onClick={() => advance.mutate(nextStatus!)} disabled={advance.isPending}
+              className={`w-full flex items-center justify-center gap-2 rounded-xl border ${nextStage.border} ${nextStage.bg} py-2.5 text-sm font-semibold ${nextStage.color} hover:opacity-80 disabled:opacity-50 transition-all`}>
+              {advance.isPending ? <Spinner size="sm" /> : <ChevronRight className="h-4 w-4" />}
+              Move to {nextStage.label}
+            </button>
           )}
           {video.status === 'uploaded' && video.youtube_url && (
-            <a
-              href={video.youtube_url}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center justify-center gap-2 w-full rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
-            >
+            <a href={video.youtube_url} target="_blank" rel="noreferrer"
+              className="flex items-center justify-center gap-2 w-full rounded-xl border border-red-500/25 bg-red-500/10 py-2.5 text-sm font-medium text-red-400 hover:bg-red-500/20">
               <ExternalLink className="h-4 w-4" /> View on YouTube
             </a>
           )}
-
-          {/* Save */}
-          <Button
-            variant="secondary"
-            className="w-full"
-            loading={update.isPending}
-            onClick={() =>
-              update.mutate({
-                title,
-                idea_description: desc,
-                script,
-                tags,
-                youtube_url: ytUrl,
-              })
-            }
-          >
-            Save Changes
-          </Button>
-
-          {/* Delete */}
-          <button
-            onClick={() => del.mutate()}
-            className="flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm text-red-500 hover:bg-red-50"
-          >
+          <button onClick={() => update.mutate({ title, idea_description: desc, script, tags, youtube_url: ytUrl })} disabled={update.isPending}
+            className="w-full flex items-center justify-center gap-2 rounded-xl border border-white/8 bg-white/4 py-2.5 text-sm font-semibold text-slate-300 hover:bg-white/8 disabled:opacity-50 transition-all">
+            {update.isPending ? <Spinner size="sm" /> : null} Save Changes
+          </button>
+          <button onClick={() => del.mutate()}
+            className="w-full flex items-center justify-center gap-2 rounded-xl py-2 text-sm text-red-500 hover:bg-red-500/10 transition-all">
             <Trash2 className="h-3.5 w-3.5" /> Delete Video
           </button>
         </div>
@@ -238,73 +170,9 @@ function VideoDrawer({
   )
 }
 
-// ─── Kanban column ─────────────────────────────────────────────────────────────
-function KanbanColumn({
-  status,
-  videos,
-  onSelect,
-}: {
-  status: VideoStatus
-  videos: Video[]
-  onSelect: (v: Video) => void
-}) {
-  const c = STATUS_COLORS[status]
-  const Icon = STAGE_ICONS[status]
-
-  return (
-    <div className="flex flex-col min-w-[260px] max-w-[280px] flex-shrink-0">
-      {/* Column header */}
-      <div className={`flex items-center gap-2 rounded-t-xl border ${c.border} ${c.bg} px-4 py-3`}>
-        <Icon className={`h-4 w-4 ${c.text}`} />
-        <span className={`text-sm font-semibold ${c.text}`}>{STATUS_LABELS[status]}</span>
-        <span className={`ml-auto rounded-full px-2 py-0.5 text-xs font-bold ${c.bg} ${c.text} border ${c.border}`}>
-          {videos.length}
-        </span>
-      </div>
-
-      {/* Cards */}
-      <div className={`flex flex-col gap-3 rounded-b-xl border-x border-b ${c.border} bg-white/60 p-3 min-h-[200px]`}>
-        {videos.length === 0 && (
-          <div className="py-8 text-center">
-            <p className="text-xs text-slate-400">No videos here</p>
-          </div>
-        )}
-        {videos.map((v) => (
-          <button
-            key={v.id}
-            onClick={() => onSelect(v)}
-            className="group w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm hover:shadow-md hover:border-slate-300 transition-all"
-          >
-            <p className="text-sm font-medium text-slate-900 line-clamp-2 group-hover:text-blue-700">
-              {v.title}
-            </p>
-            {v.idea_description && (
-              <p className="mt-1.5 text-xs text-slate-400 line-clamp-2">{v.idea_description}</p>
-            )}
-            {v.tags && (
-              <div className="mt-2 flex flex-wrap gap-1">
-                {v.tags.split(',').slice(0, 3).map((t) => (
-                  <span
-                    key={t}
-                    className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500"
-                  >
-                    {t.trim()}
-                  </span>
-                ))}
-              </div>
-            )}
-            <p className="mt-3 text-xs text-slate-300">{formatDate(v.created_at)}</p>
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// ─── Main page ─────────────────────────────────────────────────────────────────
 export default function YoutubePage() {
   const qc = useQueryClient()
-  const addToast = useUIStore((s) => s.addToast)
+  const addToast = useUIStore(s => s.addToast)
   const [selected, setSelected] = useState<Video | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [newTitle, setNewTitle] = useState('')
@@ -313,137 +181,158 @@ export default function YoutubePage() {
 
   const { data: videos = [], isLoading } = useQuery<Video[]>({
     queryKey: ['videos'],
-    queryFn: () => api.get('/api/youtube/').then((r) => r.data),
+    queryFn: () => api.get('/api/youtube/').then(r => r.data),
   })
 
   const createMutation = useMutation({
-    mutationFn: (payload: object) =>
-      api.post('/api/youtube/', payload).then((r) => r.data),
+    mutationFn: (payload: object) => api.post('/api/youtube/', payload).then(r => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['videos'] })
       addToast('Video added to Script stage!', 'success')
-      setShowCreate(false)
-      setNewTitle('')
-      setNewDesc('')
-      setNewTags('')
+      setShowCreate(false); setNewTitle(''); setNewDesc(''); setNewTags('')
     },
     onError: () => addToast('Failed to create video', 'error'),
   })
 
-  // Group videos by status
-  const byStatus = VIDEO_STATUSES.reduce(
-    (acc, s) => ({ ...acc, [s]: videos.filter((v) => v.status === s) }),
+  const byStatus = STAGES.reduce(
+    (acc, s) => ({ ...acc, [s.key]: videos.filter(v => v.status === s.key) }),
     {} as Record<VideoStatus, Video[]>
   )
 
   return (
-    <div className="flex flex-col h-full">
-      {/* ── Page header ── */}
-      <div className="flex items-center justify-between mb-6">
+    <div className="flex flex-col h-full min-h-0">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5 flex-shrink-0">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">YouTube Pipeline</h2>
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <Youtube className="h-5 w-5 text-red-400" /> YouTube Pipeline
+          </h2>
           <p className="text-slate-500 text-sm mt-0.5">
-            {videos.length} video{videos.length !== 1 ? 's' : ''} across {VIDEO_STATUSES.length} stages
+            {videos.length} video{videos.length !== 1 ? 's' : ''} across {STAGES.length} stages
           </p>
         </div>
-        <Button onClick={() => setShowCreate(true)}>
+        <button onClick={() => setShowCreate(true)}
+          className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-500 transition-all">
           <Plus className="h-4 w-4" /> New Video
-        </Button>
+        </button>
       </div>
 
-      {/* ── Pipeline progress bar ── */}
-      <div className="mb-6 flex items-center gap-0 rounded-xl overflow-hidden border border-slate-200">
-        {VIDEO_STATUSES.map((s, i) => {
-          const c = STATUS_COLORS[s]
-          const count = byStatus[s]?.length ?? 0
+      {/* Pipeline summary bar */}
+      <div className="mb-5 grid grid-cols-5 rounded-2xl overflow-hidden border border-white/8 flex-shrink-0">
+        {STAGES.map(s => {
+          const count = byStatus[s.key]?.length ?? 0
+          const Icon = s.icon
           return (
-            <div
-              key={s}
-              className={`flex-1 flex flex-col items-center py-3 gap-1 ${
-                i !== VIDEO_STATUSES.length - 1 ? 'border-r border-slate-200' : ''
-              } ${c.bg}`}
-            >
-              <span className={`text-lg font-bold ${c.text}`}>{count}</span>
-              <span className={`text-xs font-medium ${c.text}`}>{STATUS_LABELS[s]}</span>
+            <div key={s.key} className={`flex flex-col items-center py-3 gap-1 ${s.bg} border-r border-white/5 last:border-r-0`}>
+              <Icon className={`h-4 w-4 ${s.color}`} />
+              <span className={`text-lg font-bold ${s.color}`}>{count}</span>
+              <span className={`text-[10px] font-medium ${s.color} opacity-80`}>{s.label}</span>
             </div>
           )
         })}
       </div>
 
-      {/* ── Kanban board ── */}
+      {/* Kanban board */}
       {isLoading ? (
         <div className="flex flex-1 items-center justify-center">
-          <Spinner className="h-8 w-8" />
+          <Spinner size="lg" />
         </div>
       ) : (
-        <div className="flex gap-4 overflow-x-auto pb-6 flex-1">
-          {VIDEO_STATUSES.map((s) => (
-            <KanbanColumn
-              key={s}
-              status={s}
-              videos={byStatus[s] ?? []}
-              onSelect={setSelected}
-            />
-          ))}
+        <div className="flex gap-4 overflow-x-auto pb-4 flex-1 min-h-0">
+          {STAGES.map(s => {
+            const Icon = s.icon
+            const cols = byStatus[s.key] ?? []
+            return (
+              <div key={s.key} className="flex flex-col min-w-[240px] max-w-[260px] flex-shrink-0">
+                {/* Column header */}
+                <div className={`flex items-center gap-2 rounded-t-2xl border ${s.border} ${s.bg} px-4 py-3`}>
+                  <Icon className={`h-4 w-4 ${s.color}`} />
+                  <span className={`text-sm font-semibold ${s.color}`}>{s.label}</span>
+                  <span className={`ml-auto flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold ${s.bg} ${s.color} border ${s.border}`}>
+                    {cols.length}
+                  </span>
+                </div>
+                {/* Cards */}
+                <div className={`flex flex-col gap-3 rounded-b-2xl border-x border-b ${s.border} bg-white/2 p-3 flex-1 min-h-[180px]`}>
+                  {cols.length === 0 && (
+                    <div className="flex flex-col items-center justify-center flex-1 py-8">
+                      <Icon className={`h-8 w-8 ${s.color} opacity-20 mb-2`} />
+                      <p className="text-xs text-slate-600">No videos</p>
+                    </div>
+                  )}
+                  {cols.map(v => (
+                    <button key={v.id} onClick={() => setSelected(v)}
+                      className="group w-full rounded-xl border border-white/8 bg-[#0d1424] p-4 text-left hover:border-white/20 hover:bg-white/4 transition-all">
+                      <p className={`text-sm font-medium text-white line-clamp-2 group-hover:${s.color}`}>{v.title}</p>
+                      {v.idea_description && (
+                        <p className="mt-1.5 text-xs text-slate-500 line-clamp-2">{v.idea_description}</p>
+                      )}
+                      {v.tags && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {v.tags.split(',').slice(0, 3).map(t => (
+                            <span key={t} className="rounded-full bg-white/5 border border-white/8 px-2 py-0.5 text-[10px] text-slate-500">{t.trim()}</span>
+                          ))}
+                        </div>
+                      )}
+                      <p className="mt-2 text-xs text-slate-600">{formatDate(v.created_at)}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
 
-      {/* ── Video detail drawer ── */}
-      {selected && (
-        <VideoDrawer
-          video={selected}
-          onClose={() => setSelected(null)}
-        />
-      )}
+      {/* Video detail drawer */}
+      {selected && <VideoDrawer video={selected} onClose={() => setSelected(null)} />}
 
-      {/* ── Create video modal ── */}
-      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Add New Video">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault()
-            createMutation.mutate({
-              title: newTitle.trim(),
-              idea_description: newDesc,
-              tags: newTags,
-              status: 'script',
-            })
-          }}
-          className="space-y-4"
-        >
-          <Input
-            label="Video Title"
-            placeholder="e.g. How I built a Nifty breakout bot"
-            value={newTitle}
-            onChange={(e) => setNewTitle(e.target.value)}
-            required
-            autoFocus
-          />
-          <Textarea
-            label="Idea / Description"
-            placeholder="What is this video about? Key points..."
-            value={newDesc}
-            onChange={(e) => setNewDesc(e.target.value)}
-            rows={3}
-          />
-          <Input
-            label="Tags (comma-separated)"
-            placeholder="shorts, trading, nifty50"
-            value={newTags}
-            onChange={(e) => setNewTags(e.target.value)}
-          />
-          <p className="text-xs text-slate-400">
-            Video will start in the <strong>Script</strong> stage.
-          </p>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="secondary" type="button" onClick={() => setShowCreate(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" loading={createMutation.isPending}>
-              Add Video
-            </Button>
+      {/* Create modal */}
+      {showCreate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowCreate(false)} />
+          <div className="relative w-full max-w-md rounded-2xl border border-white/8 bg-[#0d1424] shadow-2xl p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-semibold text-white">Add New Video</h3>
+              <button onClick={() => setShowCreate(false)} className="rounded-lg p-1.5 text-slate-500 hover:bg-white/5">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <form onSubmit={e => {
+              e.preventDefault()
+              createMutation.mutate({ title: newTitle.trim(), idea_description: newDesc, tags: newTags, status: 'script' })
+            }} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">Video Title *</label>
+                <input autoFocus required value={newTitle} onChange={e => setNewTitle(e.target.value)}
+                  placeholder="e.g. How I built a Nifty breakout bot"
+                  className="w-full rounded-xl border border-white/8 bg-white/4 px-4 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">Idea / Description</label>
+                <textarea value={newDesc} onChange={e => setNewDesc(e.target.value)} rows={3}
+                  placeholder="What is this video about?"
+                  className="w-full rounded-xl border border-white/8 bg-white/4 px-4 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:border-blue-500/60 resize-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">Tags (comma-separated)</label>
+                <input value={newTags} onChange={e => setNewTags(e.target.value)}
+                  placeholder="shorts, trading, nifty50"
+                  className="w-full rounded-xl border border-white/8 bg-white/4 px-4 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:border-blue-500/60" />
+              </div>
+              <p className="text-xs text-slate-600">Video will start in the <span className="text-violet-400">Script</span> stage.</p>
+              <div className="flex justify-end gap-2 pt-1">
+                <button type="button" onClick={() => setShowCreate(false)}
+                  className="rounded-xl border border-white/8 px-4 py-2 text-sm text-slate-400 hover:bg-white/5">Cancel</button>
+                <button type="submit" disabled={createMutation.isPending}
+                  className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-60">
+                  {createMutation.isPending ? <Spinner size="sm" /> : null} Add Video
+                </button>
+              </div>
+            </form>
           </div>
-        </form>
-      </Modal>
+        </div>
+      )}
     </div>
   )
 }

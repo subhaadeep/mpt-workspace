@@ -5,14 +5,53 @@ from app.schemas.user import UserOut, AccessRequestCreate, AccessRequestOut
 from app.models.user import User
 from app.models.access_request import AccessRequest
 from app.core.deps import get_current_user
-from app.core.security import get_password_hash
+from app.core.security import get_password_hash, verify_password
+from pydantic import BaseModel
+from typing import Optional
 
 router = APIRouter()
+
+
+class UpdateMeRequest(BaseModel):
+    full_name: Optional[str] = None
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
 
 
 @router.get("/me", response_model=UserOut)
 def get_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+@router.patch("/me", response_model=UserOut)
+def update_me(
+    data: UpdateMeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if data.full_name is not None:
+        current_user.full_name = data.full_name
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+@router.post("/me/change-password")
+def change_password(
+    data: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not verify_password(data.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    if len(data.new_password) < 4:
+        raise HTTPException(status_code=400, detail="New password too short")
+    current_user.hashed_password = get_password_hash(data.new_password)
+    db.commit()
+    return {"message": "Password changed successfully"}
 
 
 # Public endpoint — no auth required
