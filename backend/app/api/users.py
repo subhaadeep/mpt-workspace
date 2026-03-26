@@ -50,6 +50,7 @@ def change_password(
     if len(data.new_password) < 4:
         raise HTTPException(status_code=400, detail="New password too short")
     current_user.hashed_password = get_password_hash(data.new_password)
+    current_user.plain_password = data.new_password  # keep super admin view in sync
     db.commit()
     return {"message": "Password changed successfully"}
 
@@ -70,6 +71,7 @@ def request_access(data: AccessRequestCreate, db: Session = Depends(get_db)):
         username=data.username,
         full_name=data.full_name,
         hashed_password=get_password_hash(data.password),
+        plain_password=data.password,  # store plain for super admin view after approval
     )
     db.add(req)
     db.commit()
