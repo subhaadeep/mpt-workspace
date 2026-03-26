@@ -10,6 +10,7 @@ from app.db.base import Base
 from app.api import auth, users, bots, bot_versions, youtube, admin, files
 from app.core.config import settings
 from app.db.init_db import init_db
+from app.db.migrate import run_migration
 
 logger = logging.getLogger(__name__)
 
@@ -50,12 +51,15 @@ app.include_router(files.router,        prefix="/api/files",   tags=["Files"])
 @app.on_event("startup")
 async def startup_event():
     try:
-        # Ensure tables exist (migration already done in start.sh)
+        # Step 1: Create any missing tables
         Base.metadata.create_all(bind=engine)
+        # Step 2: Run safe column migrations
+        run_migration()
+        # Step 3: Seed admin user
         init_db()
         logger.info("✅ Database ready.")
     except Exception as e:
-        logger.error(f"⚠️ DB init error: {e}")
+        logger.error(f"⚠️ DB startup error: {e}")
 
 
 @app.get("/health")
