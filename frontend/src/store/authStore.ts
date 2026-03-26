@@ -9,6 +9,7 @@ export type User = {
   username: string
   full_name?: string
   is_admin: boolean
+  is_super_admin: boolean
   can_access_bots: boolean
   can_access_youtube: boolean
   is_active: boolean
