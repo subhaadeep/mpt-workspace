@@ -67,7 +67,6 @@ export default function AdminPage() {
 
   function confirmDelete(u: UserRecord) {
     if (u.is_super_admin) { addToast('Cannot delete the super admin account', 'error'); return }
-    if (u.is_admin) { addToast('Revoke admin first, then delete', 'error'); return }
     if (!window.confirm(`Delete user "${u.full_name || u.username}"? This cannot be undone.`)) return
     deleteUserMutation.mutate(u.id)
   }
@@ -166,10 +165,20 @@ export default function AdminPage() {
                 <span className="font-medium text-white">{u.full_name || u.username}</span>
                 <span className="text-xs text-slate-500 ml-2">@{u.username}</span>
               </div>
-              {u.is_super_admin
-                ? <span className="rounded-full bg-purple-500/15 border border-purple-500/20 px-2.5 py-0.5 text-xs text-purple-400">Super Admin</span>
-                : <span className="rounded-full bg-blue-500/15 border border-blue-500/20 px-2.5 py-0.5 text-xs text-blue-400">Admin</span>
-              }
+              <div className="flex items-center gap-2">
+                {u.is_super_admin
+                  ? <span className="rounded-full bg-purple-500/15 border border-purple-500/20 px-2.5 py-0.5 text-xs text-purple-400">Super Admin</span>
+                  : <span className="rounded-full bg-blue-500/15 border border-blue-500/20 px-2.5 py-0.5 text-xs text-blue-400">Admin</span>
+                }
+                {!u.is_super_admin && (
+                  <button
+                    onClick={() => confirmDelete(u)}
+                    disabled={deleteUserMutation.isPending}
+                    className="rounded-lg p-1.5 text-slate-600 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-40">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>

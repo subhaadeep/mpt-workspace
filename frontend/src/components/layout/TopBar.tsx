@@ -1,17 +1,30 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Bell, LogOut, Menu, ExternalLink, Youtube, ChevronRight, Trash2 } from 'lucide-react'
+import { Bell, LogOut, Menu, Youtube, Bot, ChevronRight, Trash2 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { useUIStore } from '@/store/uiStore'
 import { useRouter } from 'next/navigation'
+import { useQuery } from '@tanstack/react-query'
+import api from '@/lib/api'
 
-function timeAgo(date: Date) {
-  const secs = Math.floor((Date.now() - date.getTime()) / 1000)
+type ActivityLog = {
+  id: number; video_title: string; action: string
+  from_status?: string; to_status?: string
+  done_by_name?: string; created_at: string
+}
+
+function timeAgo(dateStr: string) {
+  const secs = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000)
   if (secs < 60) return 'just now'
   if (secs < 3600) return `${Math.floor(secs / 60)}m ago`
   if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`
   return `${Math.floor(secs / 86400)}d ago`
+}
+
+const STAGE_LABELS: Record<string, string> = {
+  script: 'Script', raw_files: 'Raw Files', editing: 'Editing',
+  thumbnail: 'Thumbnail', queue: 'Queue', uploaded: 'Uploaded',
 }
 
 export default function TopBar({ title }: { title?: string }) {
@@ -19,7 +32,23 @@ export default function TopBar({ title }: { title?: string }) {
   const { toggleMobileSidebar, pipelineNotifications, markAllRead, clearNotifications } = useUIStore()
   const router = useRouter()
   const [bellOpen, setBellOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState<'youtube' | 'bots'>('youtube')
   const bellRef = useRef<HTMLDivElement>(null)
+
+  const canYoutube = !!(user?.is_admin || user?.can_access_youtube)
+  const canBots = !!(user?.is_admin || user?.can_access_bots)
+
+  // Default tab to first available
+  useEffect(() => {
+    if (!canYoutube && canBots) setActiveTab('bots')
+  }, [canYoutube, canBots])
+
+  const { data: ytActivity = [] } = useQuery<ActivityLog[]>({
+    queryKey: ['topbar-yt-activity'],
+    queryFn: () => api.get('/api/youtube/activity').then(r => r.data),
+    enabled: canYoutube && bellOpen,
+    refetchInterval: bellOpen ? 20000 : false,
+  })
 
   const unread = pipelineNotifications.filter(n => !n.read).length
 
@@ -40,11 +69,6 @@ export default function TopBar({ title }: { title?: string }) {
 
   const initials = (user?.full_name || user?.username || 'U').charAt(0).toUpperCase()
 
-  const STAGE_LABELS: Record<string, string> = {
-    script: 'Script', raw_files: 'Raw Files', editing: 'Editing',
-    thumbnail: 'Thumbnail', uploaded: 'Uploaded',
-  }
-
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-white/5 bg-[#0d1424]/80 backdrop-blur-sm px-4 md:px-6">
       {/* Left */}
@@ -58,57 +82,102 @@ export default function TopBar({ title }: { title?: string }) {
 
       {/* Right */}
       <div className="flex items-center gap-2">
-        <a href="/"
-          className="hidden sm:flex items-center gap-1.5 rounded-xl border border-white/8 px-3 py-2 text-xs text-slate-400 hover:bg-white/5 hover:text-slate-200 transition-all">
-          <ExternalLink className="h-3.5 w-3.5" /> Website
-        </a>
 
-        {/* Bell with notification dropdown */}
-        <div ref={bellRef} className="relative">
-          <button
-            onClick={() => { setBellOpen(o => !o); if (!bellOpen) markAllRead() }}
-            className="relative rounded-xl p-2 text-slate-500 hover:bg-white/5 hover:text-slate-300 transition-colors">
-            <Bell className="h-5 w-5" />
-            {unread > 0 && (
-              <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
-                {unread > 9 ? '9+' : unread}
-              </span>
-            )}
-          </button>
+        {/* Bell */}
+        {(canYoutube || canBots) && (
+          <div ref={bellRef} className="relative">
+            <button
+              onClick={() => { setBellOpen(o => !o); if (!bellOpen) markAllRead() }}
+              className="relative rounded-xl p-2 text-slate-500 hover:bg-white/5 hover:text-slate-300 transition-colors">
+              <Bell className="h-5 w-5" />
+              {unread > 0 && (
+                <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
+                  {unread > 9 ? '9+' : unread}
+                </span>
+              )}
+            </button>
 
-          {bellOpen && (
-            <div className="absolute right-0 top-12 z-50 w-80 rounded-2xl border border-white/8 bg-[#0d1424] shadow-2xl">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
-                <div className="flex items-center gap-2">
-                  <Youtube className="h-4 w-4 text-red-400" />
-                  <span className="text-sm font-semibold text-white">Pipeline Activity</span>
+            {bellOpen && (
+              <div className="absolute right-0 top-12 z-50 w-80 rounded-2xl border border-white/8 bg-[#0d1424] shadow-2xl">
+                {/* Tabs */}
+                <div className="flex border-b border-white/5">
+                  {canYoutube && (
+                    <button onClick={() => setActiveTab('youtube')}
+                      className={`flex items-center gap-1.5 flex-1 justify-center py-3 text-xs font-medium border-b-2 transition-all ${
+                        activeTab === 'youtube' ? 'border-red-500 text-red-400' : 'border-transparent text-slate-500 hover:text-slate-300'
+                      }`}>
+                      <Youtube className="h-3.5 w-3.5" /> YouTube
+                    </button>
+                  )}
+                  {canBots && (
+                    <button onClick={() => setActiveTab('bots')}
+                      className={`flex items-center gap-1.5 flex-1 justify-center py-3 text-xs font-medium border-b-2 transition-all ${
+                        activeTab === 'bots' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-300'
+                      }`}>
+                      <Bot className="h-3.5 w-3.5" /> Bots
+                    </button>
+                  )}
+                  <div className="flex items-center px-3">
+                    {pipelineNotifications.length > 0 && (
+                      <button onClick={clearNotifications} className="text-slate-600 hover:text-slate-400">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
-                {pipelineNotifications.length > 0 && (
-                  <button onClick={clearNotifications} className="text-xs text-slate-600 hover:text-slate-400">
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                )}
+
+                <div className="max-h-72 overflow-y-auto">
+                  {/* YouTube tab */}
+                  {activeTab === 'youtube' && canYoutube && (
+                    ytActivity.length === 0 ? (
+                      <div className="py-8 text-center text-sm text-slate-600">No YouTube activity yet</div>
+                    ) : (
+                      ytActivity.slice(0, 15).map(log => (
+                        <div key={log.id} className="px-4 py-3 border-b border-white/5 last:border-0 hover:bg-white/2">
+                          <p className="text-xs font-medium text-white line-clamp-1">{log.video_title}</p>
+                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                            <span className={`text-[10px] font-medium ${
+                              log.action === 'deleted' ? 'text-red-400' :
+                              log.action === 'created' ? 'text-emerald-400' : 'text-blue-400'
+                            }`}>{log.action}</span>
+                            {log.from_status && log.to_status && (
+                              <>
+                                <span className="text-[10px] text-slate-500">{STAGE_LABELS[log.from_status] || log.from_status}</span>
+                                <ChevronRight className="h-2.5 w-2.5 text-slate-600" />
+                                <span className="text-[10px] text-emerald-400 font-medium">{STAGE_LABELS[log.to_status] || log.to_status}</span>
+                              </>
+                            )}
+                            {log.done_by_name && <span className="text-[10px] text-slate-600">by {log.done_by_name}</span>}
+                            <span className="ml-auto text-[10px] text-slate-600">{timeAgo(log.created_at)}</span>
+                          </div>
+                        </div>
+                      ))
+                    )
+                  )}
+
+                  {/* Bots tab */}
+                  {activeTab === 'bots' && canBots && (
+                    pipelineNotifications.length === 0 ? (
+                      <div className="py-8 text-center text-sm text-slate-600">No bot activity yet</div>
+                    ) : (
+                      pipelineNotifications.map(n => (
+                        <div key={n.id} className={`px-4 py-3 border-b border-white/5 last:border-0 ${!n.read ? 'bg-white/2' : ''}`}>
+                          <p className="text-xs font-medium text-white line-clamp-1">{n.videoTitle}</p>
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <span className="text-[10px] text-slate-500">{STAGE_LABELS[n.fromStage] || n.fromStage}</span>
+                            <ChevronRight className="h-3 w-3 text-slate-600" />
+                            <span className="text-[10px] text-emerald-400 font-medium">{STAGE_LABELS[n.toStage] || n.toStage}</span>
+                            <span className="ml-auto text-[10px] text-slate-600">{timeAgo(n.at instanceof Date ? n.at.toISOString() : String(n.at))}</span>
+                          </div>
+                        </div>
+                      ))
+                    )
+                  )}
+                </div>
               </div>
-              <div className="max-h-72 overflow-y-auto">
-                {pipelineNotifications.length === 0 ? (
-                  <div className="py-8 text-center text-sm text-slate-600">No activity yet</div>
-                ) : (
-                  pipelineNotifications.map(n => (
-                    <div key={n.id} className={`px-4 py-3 border-b border-white/5 last:border-0 ${!n.read ? 'bg-white/2' : ''}`}>
-                      <p className="text-xs font-medium text-white line-clamp-1">{n.videoTitle}</p>
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <span className="text-[10px] text-slate-500">{STAGE_LABELS[n.fromStage] || n.fromStage}</span>
-                        <ChevronRight className="h-3 w-3 text-slate-600" />
-                        <span className="text-[10px] text-emerald-400 font-medium">{STAGE_LABELS[n.toStage] || n.toStage}</span>
-                        <span className="ml-auto text-[10px] text-slate-600">{timeAgo(n.at)}</span>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         <div className="flex items-center gap-2 rounded-xl border border-white/8 bg-white/3 px-3 py-1.5">
           <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600/40 text-blue-200 text-xs font-bold">
