@@ -9,6 +9,7 @@ class VideoStatus(str, enum.Enum):
     raw_files = "raw_files"
     editing = "editing"
     thumbnail = "thumbnail"
+    queue = "queue"
     uploaded = "uploaded"
 
 
@@ -22,6 +23,7 @@ class YouTubeVideo(Base):
     status = Column(Enum(VideoStatus), default=VideoStatus.script)
     youtube_url = Column(String(500), nullable=True)
     tags = Column(String(500), nullable=True)
+    channel_id = Column(Integer, ForeignKey("youtube_channels.id"), nullable=True)
     scheduled_date = Column(DateTime(timezone=True), nullable=True)
     uploaded_date = Column(DateTime(timezone=True), nullable=True)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -29,3 +31,4 @@ class YouTubeVideo(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     creator = relationship("User", foreign_keys=[created_by])
+    channel = relationship("YouTubeChannel", back_populates="videos")

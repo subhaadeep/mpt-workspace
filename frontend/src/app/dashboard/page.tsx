@@ -2,39 +2,82 @@
 
 import { useAuthStore } from '@/store/authStore'
 import { useQuery } from '@tanstack/react-query'
-import { Bot, Youtube, Shield, Activity, Users, Clock, TrendingUp, ArrowRight, Bell } from 'lucide-react'
+import { Bot, Youtube, Shield, Users, Clock, TrendingUp, ArrowRight, Bell, Activity, Film, Scissors, Image, Upload, FileText, Archive, ChevronRight, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import api from '@/lib/api'
+
+type ActivityLog = {
+  id: number
+  video_title: string
+  action: string
+  from_status?: string
+  to_status?: string
+  done_by_name?: string
+  created_at: string
+}
+
+const STATUS_ICON: Record<string, React.ElementType> = {
+  script: FileText, raw_files: Film, editing: Scissors,
+  thumbnail: Image, queue: Archive, uploaded: Upload,
+}
+const STATUS_COLOR: Record<string, string> = {
+  script: 'text-violet-400', raw_files: 'text-blue-400', editing: 'text-amber-400',
+  thumbnail: 'text-pink-400', queue: 'text-cyan-400', uploaded: 'text-emerald-400',
+}
+const ACTION_COLOR: Record<string, string> = {
+  moved: 'text-blue-400', created: 'text-emerald-400', deleted: 'text-red-400',
+}
+
+function timeAgo(dateStr: string) {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const m = Math.floor(diff / 60000)
+  if (m < 1) return 'just now'
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  return `${Math.floor(h / 24)}d ago`
+}
 
 export default function DashboardHome() {
   const user = useAuthStore(s => s.user)
 
   const { data: bots = [] } = useQuery({
     queryKey: ['bots'],
-    queryFn: () => api.get('/api/bots').then(r => r.data),
+    queryFn: () => api.get('/api/bots/').then(r => r.data),
     enabled: !!(user?.is_admin || user?.can_access_bots),
+    refetchInterval: 30000,
   })
 
   const { data: videos = [] } = useQuery({
     queryKey: ['youtube-videos'],
-    queryFn: () => api.get('/api/youtube/videos').then(r => r.data),
+    queryFn: () => api.get('/api/youtube/').then(r => r.data),
     enabled: !!(user?.is_admin || user?.can_access_youtube),
+    refetchInterval: 30000,
   })
 
   const { data: members = [] } = useQuery({
     queryKey: ['admin-users'],
     queryFn: () => api.get('/api/admin/users').then(r => r.data),
     enabled: !!user?.is_admin,
+    refetchInterval: 30000,
   })
 
   const { data: requests = [] } = useQuery({
     queryKey: ['access-requests'],
     queryFn: () => api.get('/api/admin/access-requests').then(r => r.data),
     enabled: !!user?.is_admin,
+    refetchInterval: 30000,
+  })
+
+  const { data: activity = [] } = useQuery<ActivityLog[]>({
+    queryKey: ['youtube-activity-dashboard'],
+    queryFn: () => api.get('/api/youtube/activity').then(r => r.data),
+    enabled: !!(user?.is_admin || user?.can_access_youtube),
+    refetchInterval: 20000,
   })
 
   const pendingRequests = (requests as { status: string }[]).filter(r => r.status === 'pending')
-  const activeBots = (bots as { is_active?: boolean }[]).filter(b => b.is_active !== false)
+  const activeBots = (bots as { status?: string }[]).filter(b => b.status === 'active')
 
   const moduleCards = [
     {
@@ -77,6 +120,7 @@ export default function DashboardHome() {
 
   return (
     <div className="space-y-6 max-w-5xl">
+      {/* Greeting */}
       <div className="flex items-start justify-between">
         <div>
           <h2 className="text-2xl font-bold text-white">
@@ -93,12 +137,13 @@ export default function DashboardHome() {
         )}
       </div>
 
+      {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Active Bots',    value: activeBots.length,          icon: Bot,     color: 'text-blue-400',   show: user?.is_admin || user?.can_access_bots },
-          { label: 'YouTube Videos', value: (videos as unknown[]).length, icon: Youtube, color: 'text-red-400',    show: user?.is_admin || user?.can_access_youtube },
+          { label: 'Active Bots',    value: activeBots.length,             icon: Bot,     color: 'text-blue-400',   show: user?.is_admin || user?.can_access_bots },
+          { label: 'YouTube Videos', value: (videos as unknown[]).length,  icon: Youtube, color: 'text-red-400',    show: user?.is_admin || user?.can_access_youtube },
           { label: 'Team Members',   value: (members as unknown[]).length, icon: Users,   color: 'text-violet-400', show: user?.is_admin },
-          { label: 'Pending Access', value: pendingRequests.length,      icon: Clock,   color: 'text-amber-400',  show: user?.is_admin },
+          { label: 'Pending Access', value: pendingRequests.length,        icon: Clock,   color: 'text-amber-400',  show: user?.is_admin },
         ].filter(s => s.show).map((s, i) => {
           const Icon = s.icon
           return (
@@ -114,6 +159,7 @@ export default function DashboardHome() {
         })}
       </div>
 
+      {/* Module cards */}
       <div>
         <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-600 mb-3">Modules</h3>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -139,13 +185,73 @@ export default function DashboardHome() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-white/5 bg-white/2 p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <Activity className="h-4 w-4 text-slate-500" />
-          <h3 className="text-sm font-medium text-slate-400">Recent Activity</h3>
+      {/* YouTube Activity Feed */}
+      {(user?.is_admin || user?.can_access_youtube) && (
+        <div className="rounded-2xl border border-white/5 bg-white/2 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Activity className="h-4 w-4 text-red-400" />
+            <h3 className="text-sm font-medium text-white">YouTube Activity</h3>
+            <span className="ml-auto text-xs text-slate-600">Last 50 events · auto-refreshes</span>
+          </div>
+
+          {activity.length === 0 ? (
+            <p className="text-sm text-slate-600 text-center py-6">No activity yet. Start moving videos through the pipeline!</p>
+          ) : (
+            <div className="space-y-1">
+              {activity.slice(0, 12).map(log => {
+                const toIcon = log.to_status ? STATUS_ICON[log.to_status] : null
+                const ToIcon = toIcon
+                return (
+                  <div key={log.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-white/3 transition-all">
+                    {/* Action icon */}
+                    <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
+                      log.action === 'deleted' ? 'bg-red-500/10' :
+                      log.action === 'created' ? 'bg-emerald-500/10' : 'bg-blue-500/10'
+                    }`}>
+                      {log.action === 'deleted' ? <Trash2 className="h-3.5 w-3.5 text-red-400" /> :
+                       log.action === 'created' ? <FileText className="h-3.5 w-3.5 text-emerald-400" /> :
+                       <ChevronRight className="h-3.5 w-3.5 text-blue-400" />}
+                    </div>
+
+                    {/* Text */}
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm text-slate-300 truncate font-medium">{log.video_title}</span>
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        <span className={`text-xs font-medium ${ACTION_COLOR[log.action] || 'text-slate-500'}`}>
+                          {log.action}
+                        </span>
+                        {log.from_status && log.to_status && (
+                          <>
+                            <span className={`text-[10px] font-medium ${STATUS_COLOR[log.from_status] || 'text-slate-500'}`}>
+                              {log.from_status.replace('_', ' ')}
+                            </span>
+                            <ChevronRight className="h-2.5 w-2.5 text-slate-600" />
+                            {ToIcon && <ToIcon className={`h-3 w-3 ${STATUS_COLOR[log.to_status] || 'text-slate-500'}`} />}
+                            <span className={`text-[10px] font-medium ${STATUS_COLOR[log.to_status] || 'text-slate-500'}`}>
+                              {log.to_status.replace('_', ' ')}
+                            </span>
+                          </>
+                        )}
+                        {log.done_by_name && (
+                          <span className="text-[10px] text-slate-600">by {log.done_by_name}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Time */}
+                    <span className="text-[10px] text-slate-600 shrink-0">{timeAgo(log.created_at)}</span>
+                  </div>
+                )
+              })}
+              {activity.length > 12 && (
+                <Link href="/dashboard/youtube" className="block text-center text-xs text-slate-600 hover:text-slate-400 pt-2">
+                  View all {activity.length} events →
+                </Link>
+              )}
+            </div>
+          )}
         </div>
-        <p className="text-sm text-slate-600 text-center py-4">Activity feed coming soon...</p>
-      </div>
+      )}
     </div>
   )
 }

@@ -10,6 +10,7 @@ class VideoCreate(BaseModel):
     script: Optional[str] = None
     status: VideoStatus = VideoStatus.script
     tags: Optional[str] = None
+    channel_id: Optional[int] = None
     scheduled_date: Optional[datetime] = None
     youtube_url: Optional[str] = None
 
@@ -20,6 +21,7 @@ class VideoUpdate(BaseModel):
     script: Optional[str] = None
     status: Optional[VideoStatus] = None
     tags: Optional[str] = None
+    channel_id: Optional[int] = None
     scheduled_date: Optional[datetime] = None
     uploaded_date: Optional[datetime] = None
     youtube_url: Optional[str] = None
@@ -32,6 +34,7 @@ class VideoOut(BaseModel):
     script: Optional[str]
     status: VideoStatus
     tags: Optional[str]
+    channel_id: Optional[int]
     scheduled_date: Optional[datetime]
     uploaded_date: Optional[datetime]
     youtube_url: Optional[str]
@@ -39,5 +42,4 @@ class VideoOut(BaseModel):
     created_at: datetime
     updated_at: Optional[datetime]
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}

@@ -16,12 +16,15 @@ router = APIRouter()
 @router.get("/", response_model=List[VideoOut])
 def list_videos(
     status: Optional[VideoStatus] = None,
+    channel_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_youtube_access),
 ):
     query = db.query(YouTubeVideo).order_by(YouTubeVideo.created_at.desc())
     if status:
         query = query.filter(YouTubeVideo.status == status)
+    if channel_id:
+        query = query.filter(YouTubeVideo.channel_id == channel_id)
     return query.all()
 
 
@@ -35,7 +38,6 @@ def create_video(
     db.add(video)
     db.commit()
     db.refresh(video)
-    # Log activity
     log = YouTubeActivity(
         video_id=video.id,
         video_title=video.title,
@@ -57,7 +59,7 @@ def list_activity(
     activities = db.query(YouTubeActivity).order_by(YouTubeActivity.created_at.desc()).limit(50).all()
     result = []
     for a in activities:
-        out = YouTubeActivityOut(
+        result.append(YouTubeActivityOut(
             id=a.id,
             video_id=a.video_id,
             video_title=a.video_title,
@@ -68,8 +70,7 @@ def list_activity(
             done_by_name=a.done_by.full_name or a.done_by.username if a.done_by else "Unknown",
             note=a.note,
             created_at=a.created_at,
-        )
-        result.append(out)
+        ))
     return result
 
 
@@ -81,7 +82,7 @@ def list_deleted(
     deleted = db.query(DeletedVideo).order_by(DeletedVideo.deleted_at.desc()).all()
     result = []
     for d in deleted:
-        out = DeletedVideoOut(
+        result.append(DeletedVideoOut(
             id=d.id,
             original_id=d.original_id,
             title=d.title,
@@ -93,9 +94,21 @@ def list_deleted(
             deleted_by_id=d.deleted_by_id,
             deleted_by_name=d.deleted_by.full_name or d.deleted_by.username if d.deleted_by else "Unknown",
             deleted_at=d.deleted_at,
-        )
-        result.append(out)
+        ))
     return result
+
+
+@router.get("/stats", response_model=dict)
+def get_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_youtube_access)
+):
+    total = db.query(YouTubeVideo).count()
+    by_status = {}
+    for s in VideoStatus:
+        by_status[s.value] = db.query(YouTubeVideo).filter(YouTubeVideo.status == s).count()
+    deleted_count = db.query(DeletedVideo).count()
+    return {"total": total, "by_status": by_status, "deleted": deleted_count}
 
 
 @router.get("/{video_id}", response_model=VideoOut)
@@ -126,7 +139,6 @@ def update_video(
         setattr(video, key, value)
     db.commit()
     db.refresh(video)
-    # Log if status changed (video moved)
     new_status = video.status
     if "status" in updates and old_status != new_status:
         log = YouTubeActivity(
@@ -151,7 +163,6 @@ def delete_video(
     video = db.query(YouTubeVideo).filter(YouTubeVideo.id == video_id).first()
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
-    # Save to deleted_videos archive
     deleted = DeletedVideo(
         original_id=video.id,
         title=video.title,
@@ -163,7 +174,6 @@ def delete_video(
         deleted_by_id=current_user.id,
     )
     db.add(deleted)
-    # Log activity
     log = YouTubeActivity(
         video_id=None,
         video_title=video.title,
