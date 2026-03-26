@@ -26,9 +26,13 @@ app.include_router(users.router,        prefix="/api/users",   tags=["users"])
 
 
 def run_migrations():
-    """Apply any missing columns/tables/constraints before the app starts."""
-    with engine.connect() as conn:
-        # 1. Add plain_password column to users if missing
+    """Apply any missing columns/tables/constraints before the app starts.
+    Uses AUTOCOMMIT isolation level so every DDL statement commits immediately,
+    which is required for ALTER TABLE to actually persist before the ORM query runs.
+    """
+    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+
+        # 1. Add plain_password to users if missing
         conn.execute(text("""
             DO $$
             BEGIN
@@ -41,7 +45,46 @@ def run_migrations():
             END$$;
         """))
 
-        # 2. Create login_logs table if it doesn't exist (with CASCADE FK)
+        # 2. Add is_super_admin to users if missing
+        conn.execute(text("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name='users' AND column_name='is_super_admin'
+                ) THEN
+                    ALTER TABLE users ADD COLUMN is_super_admin BOOLEAN DEFAULT FALSE;
+                END IF;
+            END$$;
+        """))
+
+        # 3. Add can_access_bots to users if missing
+        conn.execute(text("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name='users' AND column_name='can_access_bots'
+                ) THEN
+                    ALTER TABLE users ADD COLUMN can_access_bots BOOLEAN DEFAULT FALSE;
+                END IF;
+            END$$;
+        """))
+
+        # 4. Add can_access_youtube to users if missing
+        conn.execute(text("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name='users' AND column_name='can_access_youtube'
+                ) THEN
+                    ALTER TABLE users ADD COLUMN can_access_youtube BOOLEAN DEFAULT FALSE;
+                END IF;
+            END$$;
+        """))
+
+        # 5. Create login_logs with CASCADE FK if not exists
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS login_logs (
                 id            SERIAL PRIMARY KEY,
@@ -53,7 +96,7 @@ def run_migrations():
             );
         """))
 
-        # 3. If login_logs already existed but FK lacked CASCADE, fix it
+        # 6. Fix existing login_logs FK if it lacks CASCADE
         conn.execute(text("""
             DO $$
             DECLARE
@@ -76,8 +119,6 @@ def run_migrations():
                 END IF;
             END$$;
         """))
-
-        conn.commit()
 
 
 @app.on_event("startup")
