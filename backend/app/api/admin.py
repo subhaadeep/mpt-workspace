@@ -89,6 +89,9 @@ def delete_user(
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin)
 ):
+    # Super admins are not allowed to delete anyone
+    if admin.is_super_admin:
+        raise HTTPException(status_code=403, detail="Super admins cannot delete users.")
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -138,7 +141,7 @@ def get_login_logs(
     return result
 
 
-# ── Access Requests ──────────────────────────────────────────
+# ── Access Requests ─────────────────────────────────────────────
 
 @router.get("/access-requests", response_model=List[AccessRequestOut])
 def list_access_requests(db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):

@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle2, XCircle, User, Shield, Clock, Trash2, Bot, Youtube, ShieldCheck, ShieldOff } from 'lucide-react'
 import api from '@/lib/api'
 import { useUIStore } from '@/store/uiStore'
+import { useAuthStore } from '@/store/authStore'
 import { Spinner } from '@/components/ui/Spinner'
 
 type AccessRequest = {
@@ -21,6 +22,8 @@ type UserRecord = {
 export default function AdminPage() {
   const qc = useQueryClient()
   const { addToast } = useUIStore()
+  const currentUser = useAuthStore(s => s.user)
+  const isSuperAdmin = !!(currentUser as unknown as { is_super_admin?: boolean })?.is_super_admin
   const [accessOptions, setAccessOptions] = useState<Record<number, { bots: boolean; youtube: boolean }>>({})
 
   const { data: requests = [], isLoading: loadingReqs } = useQuery<AccessRequest[]>({
@@ -65,8 +68,8 @@ export default function AdminPage() {
     },
   })
 
-  // Only block super admin deletion — everything else is allowed
   function confirmDelete(u: UserRecord) {
+    if (isSuperAdmin) { addToast('Super admins cannot delete users', 'error'); return }
     if (u.is_super_admin) { addToast('Cannot delete the super admin account', 'error'); return }
     if (!window.confirm(`Delete "${u.full_name || u.username}"? This cannot be undone.`)) return
     deleteUserMutation.mutate(u.id)
@@ -171,7 +174,8 @@ export default function AdminPage() {
                   ? <span className="rounded-full bg-purple-500/15 border border-purple-500/20 px-2.5 py-0.5 text-xs text-purple-400">Super Admin</span>
                   : <span className="rounded-full bg-blue-500/15 border border-blue-500/20 px-2.5 py-0.5 text-xs text-blue-400">Admin</span>
                 }
-                {!u.is_super_admin && (
+                {/* Delete button hidden entirely for super admins and for super admin targets */}
+                {!isSuperAdmin && !u.is_super_admin && (
                   <button
                     onClick={() => confirmDelete(u)}
                     disabled={deleteUserMutation.isPending}
@@ -224,12 +228,15 @@ export default function AdminPage() {
                     className="flex items-center gap-1.5 rounded-lg border border-blue-500/20 bg-blue-500/10 px-2.5 py-1 text-xs text-blue-400 hover:bg-blue-500/20 transition-all">
                     <ShieldCheck className="h-3.5 w-3.5" /> Make Admin
                   </button>
-                  <button
-                    onClick={() => confirmDelete(u)}
-                    disabled={deleteUserMutation.isPending}
-                    className="rounded-lg p-1.5 text-slate-600 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-40">
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  {/* Delete button hidden for super admins */}
+                  {!isSuperAdmin && (
+                    <button
+                      onClick={() => confirmDelete(u)}
+                      disabled={deleteUserMutation.isPending}
+                      className="rounded-lg p-1.5 text-slate-600 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-40">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
