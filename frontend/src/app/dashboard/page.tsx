@@ -12,6 +12,11 @@ type ActivityLog = {
   from_status?: string; to_status?: string; done_by_name?: string; created_at: string
 }
 
+type BotActivityLog = {
+  id: number; bot_name?: string; action: string; detail?: string
+  done_by_name?: string; created_at: string
+}
+
 type LoginLog = {
   id: number; user_id: number; username: string; full_name?: string
   logged_in_at: string; logged_out_at?: string; is_active: boolean
@@ -32,6 +37,7 @@ const STATUS_COLOR: Record<string, string> = {
 }
 const ACTION_COLOR: Record<string, string> = {
   moved: 'text-blue-400', created: 'text-emerald-400', deleted: 'text-red-400',
+  updated: 'text-amber-400', started: 'text-green-400', stopped: 'text-red-400',
 }
 
 function timeAgo(dateStr: string) {
@@ -54,17 +60,21 @@ export default function DashboardHome() {
   const [showPasswordsModal, setShowPasswordsModal] = useState(false)
   const [revealedIds, setRevealedIds] = useState<Set<number>>(new Set())
 
+  const canSeeBots = !!(user?.is_admin || user?.can_access_bots)
+  const canSeeYoutube = !!(user?.is_admin || user?.can_access_youtube)
+  const isSuperAdmin = !!(user as unknown as { is_super_admin?: boolean })?.is_super_admin
+
   const { data: bots = [] } = useQuery({
     queryKey: ['bots'],
     queryFn: () => api.get('/api/bots/').then(r => r.data),
-    enabled: !!(user?.is_admin || user?.can_access_bots),
+    enabled: canSeeBots,
     refetchInterval: 30000,
   })
 
   const { data: videos = [] } = useQuery({
     queryKey: ['youtube-videos'],
     queryFn: () => api.get('/api/youtube/').then(r => r.data),
-    enabled: !!(user?.is_admin || user?.can_access_youtube),
+    enabled: canSeeYoutube,
     refetchInterval: 30000,
   })
 
@@ -82,10 +92,17 @@ export default function DashboardHome() {
     refetchInterval: 30000,
   })
 
-  const { data: activity = [] } = useQuery<ActivityLog[]>({
+  const { data: youtubeActivity = [] } = useQuery<ActivityLog[]>({
     queryKey: ['youtube-activity-dashboard'],
     queryFn: () => api.get('/api/youtube/activity').then(r => r.data),
-    enabled: !!(user?.is_admin || user?.can_access_youtube),
+    enabled: canSeeYoutube,
+    refetchInterval: 20000,
+  })
+
+  const { data: botActivity = [] } = useQuery<BotActivityLog[]>({
+    queryKey: ['bot-activity-dashboard'],
+    queryFn: () => api.get('/api/bots/activity').then(r => r.data),
+    enabled: canSeeBots,
     refetchInterval: 20000,
   })
 
@@ -99,10 +116,8 @@ export default function DashboardHome() {
   const { data: usersWithPasswords = [] } = useQuery<UserWithPassword[]>({
     queryKey: ['users-passwords'],
     queryFn: () => api.get('/api/admin/users/passwords').then(r => r.data),
-    enabled: !!(user as unknown as { is_super_admin?: boolean })?.is_super_admin && showPasswordsModal,
+    enabled: isSuperAdmin && showPasswordsModal,
   })
-
-  const isSuperAdmin = !!(user as unknown as { is_super_admin?: boolean })?.is_super_admin
 
   const pendingRequests = (requests as { status: string }[]).filter(r => r.status === 'pending')
   const activeBots = (bots as { status?: string }[]).filter(b => b.status === 'active')
@@ -124,7 +139,7 @@ export default function DashboardHome() {
       color: 'from-blue-500/10 to-blue-600/5 border-blue-500/20 hover:border-blue-400/40',
       iconBg: 'bg-blue-500/15', iconColor: 'text-blue-400',
       stat: activeBots.length, statLabel: 'active',
-      show: user?.is_admin || user?.can_access_bots,
+      show: canSeeBots,
     },
     {
       href: '/dashboard/youtube', icon: Youtube, label: 'YouTube',
@@ -132,7 +147,7 @@ export default function DashboardHome() {
       color: 'from-red-500/10 to-red-600/5 border-red-500/20 hover:border-red-400/40',
       iconBg: 'bg-red-500/15', iconColor: 'text-red-400',
       stat: (videos as unknown[]).length, statLabel: 'videos',
-      show: user?.is_admin || user?.can_access_youtube,
+      show: canSeeYoutube,
     },
     {
       href: '/dashboard/admin', icon: Shield, label: 'Admin Panel',
@@ -166,10 +181,10 @@ export default function DashboardHome() {
       {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Active Bots',    value: activeBots.length,             icon: Bot,       color: 'text-blue-400',   show: user?.is_admin || user?.can_access_bots },
-          { label: 'YouTube Videos', value: (videos as unknown[]).length,  icon: Youtube,   color: 'text-red-400',    show: user?.is_admin || user?.can_access_youtube },
-          { label: 'Team Members',   value: (members as unknown[]).length, icon: Users,     color: 'text-violet-400', show: user?.is_admin },
-          { label: 'Pending Access', value: pendingRequests.length,        icon: Clock,     color: 'text-amber-400',  show: user?.is_admin },
+          { label: 'Active Bots',    value: activeBots.length,             icon: Bot,     color: 'text-blue-400',   show: canSeeBots },
+          { label: 'YouTube Videos', value: (videos as unknown[]).length,  icon: Youtube, color: 'text-red-400',    show: canSeeYoutube },
+          { label: 'Team Members',   value: (members as unknown[]).length, icon: Users,   color: 'text-violet-400', show: !!user?.is_admin },
+          { label: 'Pending Access', value: pendingRequests.length,        icon: Clock,   color: 'text-amber-400',  show: !!user?.is_admin },
         ].filter(s => s.show).map((s, i) => {
           const Icon = s.icon
           return (
@@ -251,19 +266,19 @@ export default function DashboardHome() {
         </div>
       </div>
 
-      {/* YouTube Activity Feed */}
-      {(user?.is_admin || user?.can_access_youtube) && (
+      {/* YouTube Activity Feed — only if user has YouTube permission */}
+      {canSeeYoutube && (
         <div className="rounded-2xl border border-white/5 bg-white/2 p-5">
           <div className="flex items-center gap-2 mb-4">
-            <Activity className="h-4 w-4 text-red-400" />
+            <Youtube className="h-4 w-4 text-red-400" />
             <h3 className="text-sm font-medium text-white">YouTube Activity</h3>
             <span className="ml-auto text-xs text-slate-600">Last 50 events · auto-refreshes</span>
           </div>
-          {activity.length === 0 ? (
-            <p className="text-sm text-slate-600 text-center py-6">No activity yet.</p>
+          {youtubeActivity.length === 0 ? (
+            <p className="text-sm text-slate-600 text-center py-6">No YouTube activity yet.</p>
           ) : (
             <div className="space-y-1">
-              {activity.slice(0, 12).map(log => {
+              {youtubeActivity.slice(0, 12).map(log => {
                 const toIcon = log.to_status ? STATUS_ICON[log.to_status] : null
                 const ToIcon = toIcon
                 return (
@@ -295,6 +310,45 @@ export default function DashboardHome() {
                   </div>
                 )
               })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Bot Activity Feed — only if user has Bot permission */}
+      {canSeeBots && (
+        <div className="rounded-2xl border border-white/5 bg-white/2 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Bot className="h-4 w-4 text-blue-400" />
+            <h3 className="text-sm font-medium text-white">Bot Activity</h3>
+            <span className="ml-auto text-xs text-slate-600">Last 50 events · auto-refreshes</span>
+          </div>
+          {botActivity.length === 0 ? (
+            <p className="text-sm text-slate-600 text-center py-6">No bot activity yet.</p>
+          ) : (
+            <div className="space-y-1">
+              {botActivity.slice(0, 12).map(log => (
+                <div key={log.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-white/3 transition-all">
+                  <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
+                    log.action === 'deleted' ? 'bg-red-500/10' :
+                    log.action === 'created' ? 'bg-emerald-500/10' : 'bg-blue-500/10'
+                  }`}>
+                    <Bot className={`h-3.5 w-3.5 ${
+                      log.action === 'deleted' ? 'text-red-400' :
+                      log.action === 'created' ? 'text-emerald-400' : 'text-blue-400'
+                    }`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm text-slate-300 truncate font-medium">{log.bot_name || 'Bot'}</span>
+                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                      <span className={`text-xs font-medium ${ACTION_COLOR[log.action] || 'text-slate-500'}`}>{log.action}</span>
+                      {log.detail && <span className="text-[10px] text-slate-500">{log.detail}</span>}
+                      {log.done_by_name && <span className="text-[10px] text-slate-600">by {log.done_by_name}</span>}
+                    </div>
+                  </div>
+                  <span className="text-[10px] text-slate-600 shrink-0">{timeAgo(log.created_at)}</span>
+                </div>
+              ))}
             </div>
           )}
         </div>
