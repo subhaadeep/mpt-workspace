@@ -50,11 +50,13 @@ app.include_router(files.router,        prefix="/api/files",   tags=["Files"])
 @app.on_event("startup")
 async def startup_event():
     try:
+        # Drop all tables and recreate — safe since we manage schema manually
+        Base.metadata.drop_all(bind=engine)
         Base.metadata.create_all(bind=engine)
         init_db()
         logger.info("✅ Database initialized successfully.")
     except Exception as e:
-        logger.error(f"⚠️ DB init failed (will retry on first request): {e}")
+        logger.error(f"⚠️ DB init failed: {e}")
 
 
 @app.get("/health")
