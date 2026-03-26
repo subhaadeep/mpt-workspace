@@ -50,13 +50,12 @@ app.include_router(files.router,        prefix="/api/files",   tags=["Files"])
 @app.on_event("startup")
 async def startup_event():
     try:
-        # Drop all tables and recreate — safe since we manage schema manually
-        Base.metadata.drop_all(bind=engine)
+        # Ensure tables exist (migration already done in start.sh)
         Base.metadata.create_all(bind=engine)
         init_db()
-        logger.info("✅ Database initialized successfully.")
+        logger.info("✅ Database ready.")
     except Exception as e:
-        logger.error(f"⚠️ DB init failed: {e}")
+        logger.error(f"⚠️ DB init error: {e}")
 
 
 @app.get("/health")
