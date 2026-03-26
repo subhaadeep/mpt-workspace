@@ -3,12 +3,14 @@ from sqlalchemy.orm import Session
 from typing import List
 from app.db.session import get_db
 from app.models.bot import Bot
+from app.models.bot_activity import BotActivity
 from app.models.performance import PerformanceData
 from app.models.ga_data import GAData
 from app.models.test_data import TestData
 from app.models.code_storage import CodeStorage
 from app.models.documentation import Documentation
 from app.schemas.bot import BotCreate, BotUpdate, BotOut
+from app.schemas.bot_activity import BotActivityOut
 from app.schemas.performance import PerformanceCreate, PerformanceOut
 from app.schemas.ga_data import GADataCreate, GADataOut
 from app.schemas.test_data import TestDataCreate, TestDataOut
@@ -33,7 +35,31 @@ def create_bot(data: BotCreate, db: Session = Depends(get_db), current_user: Use
     db.add(bot)
     db.commit()
     db.refresh(bot)
+    log = BotActivity(bot_id=bot.id, bot_name=bot.name, action="created", done_by_id=current_user.id)
+    db.add(log)
+    db.commit()
     return bot
+
+
+@router.get("/activity", response_model=List[BotActivityOut])
+def list_bot_activity(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_bot_access)
+):
+    activities = db.query(BotActivity).order_by(BotActivity.created_at.desc()).limit(50).all()
+    result = []
+    for a in activities:
+        result.append(BotActivityOut(
+            id=a.id,
+            bot_id=a.bot_id,
+            bot_name=a.bot_name,
+            action=a.action,
+            detail=a.detail,
+            done_by_id=a.done_by_id,
+            done_by_name=a.done_by.full_name or a.done_by.username if a.done_by else "Unknown",
+            created_at=a.created_at,
+        ))
+    return result
 
 
 @router.get("/{bot_id}", response_model=BotOut)
@@ -49,10 +75,15 @@ def update_bot(bot_id: int, data: BotUpdate, db: Session = Depends(get_db), curr
     bot = db.query(Bot).filter(Bot.id == bot_id).first()
     if not bot:
         raise HTTPException(status_code=404, detail="Bot not found")
-    for key, value in data.model_dump(exclude_unset=True).items():
+    updates = data.model_dump(exclude_unset=True)
+    for key, value in updates.items():
         setattr(bot, key, value)
     db.commit()
     db.refresh(bot)
+    detail = ", ".join(f"{k}" for k in updates.keys())
+    log = BotActivity(bot_id=bot.id, bot_name=bot.name, action="updated", detail=detail, done_by_id=current_user.id)
+    db.add(log)
+    db.commit()
     return bot
 
 
@@ -61,6 +92,8 @@ def delete_bot(bot_id: int, db: Session = Depends(get_db), current_user: User = 
     bot = db.query(Bot).filter(Bot.id == bot_id).first()
     if not bot:
         raise HTTPException(status_code=404, detail="Bot not found")
+    log = BotActivity(bot_id=None, bot_name=bot.name, action="deleted", done_by_id=current_user.id)
+    db.add(log)
     db.delete(bot)
     db.commit()
 

@@ -9,9 +9,15 @@ import { useQuery } from '@tanstack/react-query'
 import api from '@/lib/api'
 
 type ActivityLog = {
-  id: number; video_title: string; action: string
-  from_status?: string; to_status?: string
-  done_by_name?: string; created_at: string
+  id: number
+  video_title?: string
+  bot_name?: string
+  action: string
+  from_status?: string
+  to_status?: string
+  detail?: string
+  done_by_name?: string
+  created_at: string
 }
 
 function timeAgo(dateStr: string) {
@@ -29,19 +35,21 @@ const STAGE_LABELS: Record<string, string> = {
 
 export default function TopBar({ title }: { title?: string }) {
   const { user, logout } = useAuthStore()
-  const { toggleMobileSidebar, pipelineNotifications, markAllRead, clearNotifications } = useUIStore()
+  const { toggleMobileSidebar } = useUIStore()
   const router = useRouter()
   const [bellOpen, setBellOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<'youtube' | 'bots'>('youtube')
   const bellRef = useRef<HTMLDivElement>(null)
 
   const canYoutube = !!(user?.is_admin || user?.can_access_youtube)
   const canBots = !!(user?.is_admin || user?.can_access_bots)
 
-  // Default tab to first available
+  const bothPerms = canYoutube && canBots
+  const [activeTab, setActiveTab] = useState<'youtube' | 'bots'>(canYoutube ? 'youtube' : 'bots')
+
+  // When bell opens, set correct default tab
   useEffect(() => {
-    if (!canYoutube && canBots) setActiveTab('bots')
-  }, [canYoutube, canBots])
+    if (bellOpen) setActiveTab(canYoutube ? 'youtube' : 'bots')
+  }, [bellOpen, canYoutube])
 
   const { data: ytActivity = [] } = useQuery<ActivityLog[]>({
     queryKey: ['topbar-yt-activity'],
@@ -50,7 +58,12 @@ export default function TopBar({ title }: { title?: string }) {
     refetchInterval: bellOpen ? 20000 : false,
   })
 
-  const unread = pipelineNotifications.filter(n => !n.read).length
+  const { data: botActivity = [] } = useQuery<ActivityLog[]>({
+    queryKey: ['topbar-bot-activity'],
+    queryFn: () => api.get('/api/bots/activity').then(r => r.data),
+    enabled: canBots && bellOpen,
+    refetchInterval: bellOpen ? 20000 : false,
+  })
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -83,52 +96,52 @@ export default function TopBar({ title }: { title?: string }) {
       {/* Right */}
       <div className="flex items-center gap-2">
 
-        {/* Bell */}
+        {/* Bell — only show if user has at least one permission */}
         {(canYoutube || canBots) && (
           <div ref={bellRef} className="relative">
             <button
-              onClick={() => { setBellOpen(o => !o); if (!bellOpen) markAllRead() }}
+              onClick={() => setBellOpen(o => !o)}
               className="relative rounded-xl p-2 text-slate-500 hover:bg-white/5 hover:text-slate-300 transition-colors">
               <Bell className="h-5 w-5" />
-              {unread > 0 && (
-                <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
-                  {unread > 9 ? '9+' : unread}
-                </span>
-              )}
             </button>
 
             {bellOpen && (
               <div className="absolute right-0 top-12 z-50 w-80 rounded-2xl border border-white/8 bg-[#0d1424] shadow-2xl">
-                {/* Tabs */}
-                <div className="flex border-b border-white/5">
-                  {canYoutube && (
-                    <button onClick={() => setActiveTab('youtube')}
+
+                {/* Tabs — only show tab bar if user has both permissions */}
+                {bothPerms && (
+                  <div className="flex border-b border-white/5">
+                    <button
+                      onClick={() => setActiveTab('youtube')}
                       className={`flex items-center gap-1.5 flex-1 justify-center py-3 text-xs font-medium border-b-2 transition-all ${
                         activeTab === 'youtube' ? 'border-red-500 text-red-400' : 'border-transparent text-slate-500 hover:text-slate-300'
                       }`}>
                       <Youtube className="h-3.5 w-3.5" /> YouTube
                     </button>
-                  )}
-                  {canBots && (
-                    <button onClick={() => setActiveTab('bots')}
+                    <button
+                      onClick={() => setActiveTab('bots')}
                       className={`flex items-center gap-1.5 flex-1 justify-center py-3 text-xs font-medium border-b-2 transition-all ${
                         activeTab === 'bots' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-300'
                       }`}>
                       <Bot className="h-3.5 w-3.5" /> Bots
                     </button>
-                  )}
-                  <div className="flex items-center px-3">
-                    {pipelineNotifications.length > 0 && (
-                      <button onClick={clearNotifications} className="text-slate-600 hover:text-slate-400">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    )}
                   </div>
-                </div>
+                )}
+
+                {/* Single header if only one permission */}
+                {!bothPerms && (
+                  <div className="flex items-center gap-2 px-4 py-3 border-b border-white/5">
+                    {canYoutube && <Youtube className="h-4 w-4 text-red-400" />}
+                    {canBots && <Bot className="h-4 w-4 text-blue-400" />}
+                    <span className="text-sm font-semibold text-white">
+                      {canYoutube ? 'YouTube Activity' : 'Bot Activity'}
+                    </span>
+                  </div>
+                )}
 
                 <div className="max-h-72 overflow-y-auto">
-                  {/* YouTube tab */}
-                  {activeTab === 'youtube' && canYoutube && (
+                  {/* YouTube content */}
+                  {(activeTab === 'youtube' || !bothPerms) && canYoutube && (
                     ytActivity.length === 0 ? (
                       <div className="py-8 text-center text-sm text-slate-600">No YouTube activity yet</div>
                     ) : (
@@ -144,7 +157,7 @@ export default function TopBar({ title }: { title?: string }) {
                               <>
                                 <span className="text-[10px] text-slate-500">{STAGE_LABELS[log.from_status] || log.from_status}</span>
                                 <ChevronRight className="h-2.5 w-2.5 text-slate-600" />
-                                <span className="text-[10px] text-emerald-400 font-medium">{STAGE_LABELS[log.to_status] || log.to_status}</span>
+                                <span className="text-[10px] text-emerald-400">{STAGE_LABELS[log.to_status] || log.to_status}</span>
                               </>
                             )}
                             {log.done_by_name && <span className="text-[10px] text-slate-600">by {log.done_by_name}</span>}
@@ -155,25 +168,29 @@ export default function TopBar({ title }: { title?: string }) {
                     )
                   )}
 
-                  {/* Bots tab */}
-                  {activeTab === 'bots' && canBots && (
-                    pipelineNotifications.length === 0 ? (
+                  {/* Bots content */}
+                  {(activeTab === 'bots' || (!bothPerms && canBots)) && canBots && (
+                    botActivity.length === 0 ? (
                       <div className="py-8 text-center text-sm text-slate-600">No bot activity yet</div>
                     ) : (
-                      pipelineNotifications.map(n => (
-                        <div key={n.id} className={`px-4 py-3 border-b border-white/5 last:border-0 ${!n.read ? 'bg-white/2' : ''}`}>
-                          <p className="text-xs font-medium text-white line-clamp-1">{n.videoTitle}</p>
-                          <div className="flex items-center gap-1.5 mt-1">
-                            <span className="text-[10px] text-slate-500">{STAGE_LABELS[n.fromStage] || n.fromStage}</span>
-                            <ChevronRight className="h-3 w-3 text-slate-600" />
-                            <span className="text-[10px] text-emerald-400 font-medium">{STAGE_LABELS[n.toStage] || n.toStage}</span>
-                            <span className="ml-auto text-[10px] text-slate-600">{timeAgo(n.at instanceof Date ? n.at.toISOString() : String(n.at))}</span>
+                      botActivity.slice(0, 15).map(log => (
+                        <div key={log.id} className="px-4 py-3 border-b border-white/5 last:border-0 hover:bg-white/2">
+                          <p className="text-xs font-medium text-white line-clamp-1">{log.bot_name}</p>
+                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                            <span className={`text-[10px] font-medium ${
+                              log.action === 'deleted' ? 'text-red-400' :
+                              log.action === 'created' ? 'text-emerald-400' : 'text-blue-400'
+                            }`}>{log.action}</span>
+                            {log.detail && <span className="text-[10px] text-slate-500">{log.detail}</span>}
+                            {log.done_by_name && <span className="text-[10px] text-slate-600">by {log.done_by_name}</span>}
+                            <span className="ml-auto text-[10px] text-slate-600">{timeAgo(log.created_at)}</span>
                           </div>
                         </div>
                       ))
                     )
                   )}
                 </div>
+
               </div>
             )}
           </div>

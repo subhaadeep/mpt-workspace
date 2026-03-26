@@ -4,7 +4,7 @@ from app.db.session import engine
 from app.db.base import Base
 
 # Import all models so Base knows about them before create_all
-from app.models import user, access_request, youtube_channel, youtube, youtube_activity, deleted_video, bot, bot_version, code_storage, performance, test_data, ga_data, documentation, upload  # noqa: F401
+from app.models import user, access_request, youtube_channel, youtube, youtube_activity, deleted_video, bot, bot_version, bot_activity, code_storage, performance, test_data, ga_data, documentation, upload  # noqa: F401
 
 from app.api import auth, admin, users, bots, bot_versions, youtube as youtube_router, youtube_channels, files
 

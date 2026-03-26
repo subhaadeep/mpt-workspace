@@ -65,9 +65,10 @@ export default function AdminPage() {
     },
   })
 
+  // Only block super admin deletion — everything else is allowed
   function confirmDelete(u: UserRecord) {
     if (u.is_super_admin) { addToast('Cannot delete the super admin account', 'error'); return }
-    if (!window.confirm(`Delete user "${u.full_name || u.username}"? This cannot be undone.`)) return
+    if (!window.confirm(`Delete "${u.full_name || u.username}"? This cannot be undone.`)) return
     deleteUserMutation.mutate(u.id)
   }
 
@@ -91,7 +92,7 @@ export default function AdminPage() {
         <p className="text-sm text-slate-500 mt-1">Manage access requests, users and admin privileges</p>
       </div>
 
-      {/* ── PENDING REQUESTS ── */}
+      {/* PENDING REQUESTS */}
       <section>
         <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-2">
           <Clock className="h-4 w-4 text-amber-400" /> Pending Access Requests
@@ -150,7 +151,7 @@ export default function AdminPage() {
         </div>
       </section>
 
-      {/* ── ADMIN USERS ── */}
+      {/* ADMIN USERS */}
       <section>
         <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-2">
           <ShieldCheck className="h-4 w-4 text-blue-400" /> Admin Accounts
@@ -184,7 +185,7 @@ export default function AdminPage() {
         </div>
       </section>
 
-      {/* ── REGULAR USERS ── */}
+      {/* REGULAR USERS */}
       <section>
         <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">All Users</h2>
         {loadingUsers && <div className="flex justify-center py-8"><Spinner /></div>}
@@ -214,7 +215,6 @@ export default function AdminPage() {
                     <Youtube className="h-3.5 w-3.5 text-red-400" />
                     <span className="text-xs text-slate-400">YouTube</span>
                   </label>
-
                   <button
                     onClick={() => {
                       if (window.confirm(`Make ${u.full_name || u.username} an admin? This gives full access.`)) {
@@ -224,7 +224,6 @@ export default function AdminPage() {
                     className="flex items-center gap-1.5 rounded-lg border border-blue-500/20 bg-blue-500/10 px-2.5 py-1 text-xs text-blue-400 hover:bg-blue-500/20 transition-all">
                     <ShieldCheck className="h-3.5 w-3.5" /> Make Admin
                   </button>
-
                   <button
                     onClick={() => confirmDelete(u)}
                     disabled={deleteUserMutation.isPending}
@@ -238,7 +237,7 @@ export default function AdminPage() {
         </div>
       </section>
 
-      {/* ── REVOKE ADMIN ── */}
+      {/* REVOKE ADMIN */}
       {adminUsers.filter(u => !u.is_super_admin).length > 0 && (
         <section>
           <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-2">
@@ -266,7 +265,7 @@ export default function AdminPage() {
         </section>
       )}
 
-      {/* ── PROCESSED REQUESTS ── */}
+      {/* PROCESSED REQUESTS */}
       {processedRequests.length > 0 && (
         <section>
           <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">Processed Requests</h2>
