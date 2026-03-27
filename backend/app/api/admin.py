@@ -23,7 +23,7 @@ def list_users_with_passwords(
     db: Session = Depends(get_db),
     super_admin: User = Depends(get_current_super_admin)
 ):
-    """Super admin only — returns plain_password field for all users."""
+    """Super admin only - returns plain_password field for all users."""
     return db.query(User).order_by(User.created_at.desc()).all()
 
 
@@ -89,14 +89,15 @@ def delete_user(
     db: Session = Depends(get_db),
     admin: User = Depends(get_current_admin)
 ):
-    # Super admins are not allowed to delete anyone
-    if admin.is_super_admin:
-        raise HTTPException(status_code=403, detail="Super admins cannot delete users.")
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    # Nobody can delete the super admin account itself
     if user.is_super_admin:
         raise HTTPException(status_code=403, detail="Cannot delete the super admin account.")
+    # Regular admins cannot delete other admins - only super admin can
+    if user.is_admin and not admin.is_super_admin:
+        raise HTTPException(status_code=403, detail="Only the super admin can delete admin accounts.")
     db.delete(user)
     db.commit()
 
@@ -141,7 +142,7 @@ def get_login_logs(
     return result
 
 
-# ── Access Requests ─────────────────────────────────────────────
+# Access Requests
 
 @router.get("/access-requests", response_model=List[AccessRequestOut])
 def list_access_requests(db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
