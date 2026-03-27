@@ -25,66 +25,41 @@ app.include_router(youtube.router,      prefix="/api/youtube", tags=["youtube"])
 app.include_router(users.router,        prefix="/api/users",   tags=["users"])
 
 
+def _add_column_if_missing(conn, column: str, col_type: str):
+    """Helper: ALTER TABLE users ADD COLUMN ... only if it doesn't exist yet."""
+    conn.execute(text(f"""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name='users' AND column_name='{column}'
+            ) THEN
+                ALTER TABLE users ADD COLUMN {column} {col_type};
+            END IF;
+        END$$;
+    """))
+
+
 def run_migrations():
     """Apply any missing columns/tables/constraints before the app starts.
-    Uses AUTOCOMMIT isolation level so every DDL statement commits immediately,
-    which is required for ALTER TABLE to actually persist before the ORM query runs.
+    Uses AUTOCOMMIT so every DDL statement commits immediately.
     """
     with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
 
-        # 1. Add plain_password to users if missing
-        conn.execute(text("""
-            DO $$
-            BEGIN
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name='users' AND column_name='plain_password'
-                ) THEN
-                    ALTER TABLE users ADD COLUMN plain_password VARCHAR;
-                END IF;
-            END$$;
-        """))
+        # --- original columns ---
+        _add_column_if_missing(conn, "plain_password",    "VARCHAR")
+        _add_column_if_missing(conn, "is_super_admin",    "BOOLEAN DEFAULT FALSE")
+        _add_column_if_missing(conn, "can_access_bots",   "BOOLEAN DEFAULT FALSE")
+        _add_column_if_missing(conn, "can_access_youtube","BOOLEAN DEFAULT FALSE")
 
-        # 2. Add is_super_admin to users if missing
-        conn.execute(text("""
-            DO $$
-            BEGIN
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name='users' AND column_name='is_super_admin'
-                ) THEN
-                    ALTER TABLE users ADD COLUMN is_super_admin BOOLEAN DEFAULT FALSE;
-                END IF;
-            END$$;
-        """))
+        # --- sub-admin columns (caused the crash) ---
+        _add_column_if_missing(conn, "is_sub_admin",      "BOOLEAN DEFAULT FALSE")
+        _add_column_if_missing(conn, "can_manage_users",  "BOOLEAN DEFAULT FALSE")
+        _add_column_if_missing(conn, "can_manage_bots",   "BOOLEAN DEFAULT FALSE")
+        _add_column_if_missing(conn, "can_manage_youtube","BOOLEAN DEFAULT FALSE")
+        _add_column_if_missing(conn, "can_view_logs",     "BOOLEAN DEFAULT FALSE")
 
-        # 3. Add can_access_bots to users if missing
-        conn.execute(text("""
-            DO $$
-            BEGIN
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name='users' AND column_name='can_access_bots'
-                ) THEN
-                    ALTER TABLE users ADD COLUMN can_access_bots BOOLEAN DEFAULT FALSE;
-                END IF;
-            END$$;
-        """))
-
-        # 4. Add can_access_youtube to users if missing
-        conn.execute(text("""
-            DO $$
-            BEGIN
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name='users' AND column_name='can_access_youtube'
-                ) THEN
-                    ALTER TABLE users ADD COLUMN can_access_youtube BOOLEAN DEFAULT FALSE;
-                END IF;
-            END$$;
-        """))
-
-        # 5. Create login_logs with CASCADE FK if not exists
+        # --- login_logs table ---
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS login_logs (
                 id            SERIAL PRIMARY KEY,
@@ -96,7 +71,7 @@ def run_migrations():
             );
         """))
 
-        # 6. Fix existing login_logs FK if it lacks CASCADE
+        # Fix existing login_logs FK if it lacks CASCADE
         conn.execute(text("""
             DO $$
             DECLARE
