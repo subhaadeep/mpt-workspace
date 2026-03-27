@@ -16,7 +16,7 @@ type Input = { name: string; type: string; value: string; description: string }
 type Screenshot = { title: string; gdrive_url: string; description: string }
 type ExtraSection = { title: string; content: string }
 type GAEntry = { id: number; run_name: string; notes: string; parameter_sets: unknown; optimization_results: unknown; best_chromosomes: unknown; created_at: string }
-type CodeEntry = { id: number; language: string; filename: string; code_content: string; description: string }
+type CodeEntry = { id: number; language: string; label: string; code: string; description: string }
 
 type Version = {
   id: number; version_name: string; notes: string | null
@@ -535,7 +535,7 @@ function CodeTab({ botId, versionId, codeEntries, reload, addToast }: {
   reload: () => void; addToast: (m: string, t: 'success'|'error'|'info'|'warning') => void
 }) {
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ language: 'python', filename: '', code_content: '', description: '' })
+  const [form, setForm] = useState({ language: 'python', label: '', code: '', description: '' })
   const [saving, setSaving] = useState(false)
 
   async function submit() {
@@ -543,7 +543,7 @@ function CodeTab({ botId, versionId, codeEntries, reload, addToast }: {
     try {
       await api.post(`/api/bots/${botId}/versions/${versionId}/code`, form)
       addToast('Code added', 'success'); setShowForm(false)
-      setForm({ language: 'python', filename: '', code_content: '', description: '' }); reload()
+      setForm({ language: 'python', label: '', code: '', description: '' }); reload()
     } finally { setSaving(false) }
   }
 
@@ -566,10 +566,10 @@ function CodeTab({ botId, versionId, codeEntries, reload, addToast }: {
               <option value="mql5">MQL5</option>
               <option value="other">Other</option>
             </select>
-            <input placeholder="Filename (e.g. strategy_v2.py)" value={form.filename} onChange={e => setForm(f=>({...f,filename:e.target.value}))} className={inputCls} />
+            <input placeholder="Label (e.g. strategy_v2.py)" value={form.label} onChange={e => setForm(f=>({...f,label:e.target.value}))} className={inputCls} />
           </div>
           <input placeholder="Description" value={form.description} onChange={e => setForm(f=>({...f,description:e.target.value}))} className={inputCls} />
-          <textarea placeholder="Paste code here..." rows={10} value={form.code_content} onChange={e => setForm(f=>({...f,code_content:e.target.value}))} className={`${areaCls} font-mono text-xs`} />
+          <textarea placeholder="Paste code here..." rows={10} value={form.code} onChange={e => setForm(f=>({...f,code:e.target.value}))} className={`${areaCls} font-mono text-xs`} />
           <div className="flex gap-2">
             <button onClick={submit} disabled={saving} className={saveBtnCls + ' disabled:opacity-60'}>{saving ? <Spinner size="sm" /> : null} Save Code</button>
             <button onClick={() => setShowForm(false)} className="rounded-xl border border-white/8 px-4 py-2.5 text-sm text-slate-400 hover:bg-white/5">Cancel</button>
@@ -589,11 +589,11 @@ function CodeTab({ botId, versionId, codeEntries, reload, addToast }: {
                   <div className="h-3 w-3 rounded-full bg-amber-500/60" />
                   <div className="h-3 w-3 rounded-full bg-emerald-500/60" />
                 </div>
-                <span className="rounded-md bg-blue-600/20 border border-blue-500/20 px-2 py-0.5 text-[10px] font-medium text-blue-300 uppercase tracking-wide">{entry.language}</span>
-                <span className="text-sm font-mono text-slate-300">{entry.filename || 'untitled'}</span>
+                <span className="rounded-md bg-blue-600/20 border border-blue-500/20 px-2 py-0.5 text-[10px] font-medium text-blue-300 uppercase tracking-wide">{entry.language ?? 'code'}</span>
+                <span className="text-sm font-mono text-slate-300">{entry.label || 'untitled'}</span>
               </div>
               <div className="flex items-center gap-2">
-                <CopyButton code={entry.code_content} />
+                <CopyButton code={entry.code ?? ''} />
                 <button onClick={async () => { await api.delete(`/api/bots/${botId}/versions/${versionId}/code/${entry.id}`); reload() }} className="rounded-lg p-1.5 text-slate-600 hover:bg-red-500/10 hover:text-red-400">
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
@@ -604,7 +604,7 @@ function CodeTab({ botId, versionId, codeEntries, reload, addToast }: {
                 <p className="text-xs text-slate-500">{entry.description}</p>
               </div>
             )}
-            <pre className="overflow-x-auto p-4 text-xs bg-[#070c14] text-slate-200 max-h-96 font-mono leading-relaxed">{entry.code_content}</pre>
+            <pre className="overflow-x-auto p-4 text-xs bg-[#070c14] text-slate-200 max-h-96 font-mono leading-relaxed">{entry.code ?? ''}</pre>
           </div>
         ))}
       </div>
