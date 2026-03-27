@@ -29,11 +29,9 @@ function BotOverviewModal({ bots, onClose }: { bots: BotItem[]; onClose: () => v
   const active = bots.filter(b => b.status === 'active').length
   const experimental = bots.filter(b => b.status === 'experimental').length
   const archived = bots.filter(b => b.status === 'archived').length
-
   const real = bots.filter(b => b.account_type === 'real').length
   const demo = bots.filter(b => b.account_type === 'demo').length
   const noAccount = bots.filter(b => !b.account_type).length
-
   const activeReal = bots.filter(b => b.status === 'active' && b.account_type === 'real').length
   const activeDemo = bots.filter(b => b.status === 'active' && b.account_type === 'demo').length
 
@@ -47,7 +45,6 @@ function BotOverviewModal({ bots, onClose }: { bots: BotItem[]; onClose: () => v
           </h3>
           <button onClick={onClose} className="rounded-lg p-1.5 text-slate-500 hover:bg-white/5"><X className="h-4 w-4" /></button>
         </div>
-
         <div className="grid grid-cols-2 gap-3 mb-4">
           <div className="rounded-xl border border-white/5 bg-white/2 p-3 text-center">
             <p className="text-2xl font-bold text-white">{total}</p>
@@ -58,7 +55,6 @@ function BotOverviewModal({ bots, onClose }: { bots: BotItem[]; onClose: () => v
             <p className="text-xs text-slate-500 mt-0.5">Active</p>
           </div>
         </div>
-
         <div className="space-y-2 mb-4">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">By Status</p>
           {[
@@ -73,7 +69,6 @@ function BotOverviewModal({ bots, onClose }: { bots: BotItem[]; onClose: () => v
             </div>
           ))}
         </div>
-
         <div className="space-y-2">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">By Account Type</p>
           {[
@@ -119,9 +114,7 @@ function AccountDropdown({ bot, onSave }: { bot: BotItem; onSave: (data: Partial
     } finally { setSaving(false) }
   }
 
-  const serverHint = accountType === 'real'
-    ? 'e.g. Exness-Real5, Blueberry-Live2'
-    : 'e.g. Exness-Demo3, Blueberry-Demo1'
+  const serverHint = accountType === 'real' ? 'e.g. Exness-Real5, Blueberry-Live2' : 'e.g. Exness-Demo3, Blueberry-Demo1'
 
   return (
     <div className="mt-3 border-t border-white/5 pt-3" onClick={e => e.stopPropagation()}>
@@ -143,10 +136,8 @@ function AccountDropdown({ bot, onSave }: { bot: BotItem; onSave: (data: Partial
         </span>
         {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
       </button>
-
       {open && (
         <div className="mt-2 rounded-xl border border-white/8 bg-[#0a0f1e] p-4 space-y-3">
-          {/* Account type */}
           <div>
             <label className="block text-[10px] font-medium text-slate-500 mb-1.5 uppercase tracking-wide">Account Type</label>
             <div className="flex gap-2">
@@ -162,8 +153,6 @@ function AccountDropdown({ bot, onSave }: { bot: BotItem; onSave: (data: Partial
               ))}
             </div>
           </div>
-
-          {/* Broker */}
           <div>
             <label className="block text-[10px] font-medium text-slate-500 mb-1.5 uppercase tracking-wide flex items-center gap-1">
               <Building2 className="h-3 w-3" /> Broker Name
@@ -171,8 +160,6 @@ function AccountDropdown({ bot, onSave }: { bot: BotItem; onSave: (data: Partial
             <input value={broker} onChange={e => setBroker(e.target.value)} placeholder="e.g. Exness, Blueberry, Zerodha"
               className="w-full rounded-xl border border-white/8 bg-white/4 px-3 py-2 text-xs text-white placeholder-slate-600 outline-none focus:border-blue-500/50" />
           </div>
-
-          {/* Broker Server */}
           <div>
             <label className="block text-[10px] font-medium text-slate-500 mb-1.5 uppercase tracking-wide flex items-center gap-1">
               <Server className="h-3 w-3" /> Broker Server
@@ -180,8 +167,6 @@ function AccountDropdown({ bot, onSave }: { bot: BotItem; onSave: (data: Partial
             <input value={brokerServer} onChange={e => setBrokerServer(e.target.value)} placeholder={serverHint}
               className="w-full rounded-xl border border-white/8 bg-white/4 px-3 py-2 text-xs text-white placeholder-slate-600 outline-none focus:border-blue-500/50" />
           </div>
-
-          {/* Account ID */}
           <div>
             <label className="block text-[10px] font-medium text-slate-500 mb-1.5 uppercase tracking-wide flex items-center gap-1">
               <CreditCard className="h-3 w-3" /> Account / Client ID
@@ -189,28 +174,20 @@ function AccountDropdown({ bot, onSave }: { bot: BotItem; onSave: (data: Partial
             <input value={accountId} onChange={e => setAccountId(e.target.value)} placeholder="Your client/account ID"
               className="w-full rounded-xl border border-white/8 bg-white/4 px-3 py-2 text-xs text-white placeholder-slate-600 outline-none focus:border-blue-500/50" />
           </div>
-
-          {/* Password */}
           <div>
             <label className="block text-[10px] font-medium text-slate-500 mb-1.5 uppercase tracking-wide flex items-center gap-1">
               <KeyRound className="h-3 w-3" /> Account Password
             </label>
             <div className="relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password} onChange={e => setPassword(e.target.value)}
+              <input type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)}
                 placeholder="Trading account password"
                 className="w-full rounded-xl border border-white/8 bg-white/4 px-3 py-2 pr-16 text-xs text-white placeholder-slate-600 outline-none focus:border-blue-500/50" />
-              <button
-                type="button"
-                onClick={() => setShowPassword(s => !s)}
+              <button type="button" onClick={() => setShowPassword(s => !s)}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-500 hover:text-slate-300 px-1">
                 {showPassword ? 'Hide' : 'Show'}
               </button>
             </div>
           </div>
-
-          {/* Balance */}
           <div>
             <label className="block text-[10px] font-medium text-slate-500 mb-1.5 uppercase tracking-wide flex items-center gap-1">
               <DollarSign className="h-3 w-3" /> Allocated Balance (₹)
@@ -218,7 +195,6 @@ function AccountDropdown({ bot, onSave }: { bot: BotItem; onSave: (data: Partial
             <input value={balance} onChange={e => setBalance(e.target.value)} placeholder="e.g. 50000"
               className="w-full rounded-xl border border-white/8 bg-white/4 px-3 py-2 text-xs text-white placeholder-slate-600 outline-none focus:border-blue-500/50" />
           </div>
-
           <button onClick={handleSave} disabled={saving}
             className="w-full rounded-xl bg-blue-600/20 border border-blue-500/30 py-2 text-xs font-semibold text-blue-400 hover:bg-blue-600/30 disabled:opacity-50">
             {saving ? 'Saving...' : 'Save Account Details'}
@@ -238,6 +214,7 @@ export default function BotsPage() {
   const [showOverview, setShowOverview] = useState(false)
   const [form, setForm] = useState({ name: '', description: '', tags: '', status: 'active' })
   const [saving, setSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
 
   async function loadBots() {
     try {
@@ -263,9 +240,16 @@ export default function BotsPage() {
   async function deleteBot(id: number, e: React.MouseEvent) {
     e.stopPropagation()
     if (!confirm('Delete this bot and all its data?')) return
-    await api.delete(`/api/bots/${id}`)
-    addToast('Bot deleted', 'info')
-    loadBots()
+    setDeletingId(id)
+    try {
+      await api.delete(`/api/bots/${id}`)
+      addToast('Bot deleted', 'info')
+      loadBots()
+    } catch {
+      addToast('Failed to delete bot', 'error')
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   async function movePriority(id: number, dir: -1 | 1, e: React.MouseEvent) {
@@ -388,10 +372,13 @@ export default function BotsPage() {
                     </div>
                   )}
                 </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
-                  <button onClick={e => deleteBot(bot.id, e)}
-                    className="rounded-xl p-2 text-slate-600 hover:bg-red-500/10 hover:text-red-400">
-                    <Trash2 className="h-3.5 w-3.5" />
+                {/* Delete button — always visible, with per-bot loading state */}
+                <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                  <button
+                    onClick={e => deleteBot(bot.id, e)}
+                    disabled={deletingId === bot.id}
+                    className="rounded-xl p-2 text-slate-600 hover:bg-red-500/10 hover:text-red-400 border border-transparent hover:border-red-500/20 transition-all disabled:opacity-40">
+                    {deletingId === bot.id ? <Spinner size="sm" /> : <Trash2 className="h-3.5 w-3.5" />}
                   </button>
                 </div>
                 <ChevronRight className="h-4 w-4 text-slate-600 group-hover:text-slate-400 shrink-0" />

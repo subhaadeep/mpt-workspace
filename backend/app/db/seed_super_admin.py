@@ -5,9 +5,7 @@ from app.core.config import settings
 
 
 def seed_super_admin(db: Session) -> None:
-    """Ensure the super admin user has is_super_admin=True, is_admin=True,
-    and plain_password backfilled (so the passwords modal never shows 'not stored').
-    """
+    """Ensure the super admin user has is_super_admin=True and is_admin=True."""
     user = db.query(User).filter(User.username == SUPER_ADMIN_USERNAME).first()
     if user:
         changed = False
@@ -18,7 +16,6 @@ def seed_super_admin(db: Session) -> None:
             user.is_admin = True
             changed = True
         if not user.plain_password:
-            # Backfill with the password from settings (env var FIRST_ADMIN_PASSWORD)
             user.plain_password = settings.FIRST_ADMIN_PASSWORD
             changed = True
         if changed:

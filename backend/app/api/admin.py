@@ -5,16 +5,16 @@ from app.db.session import get_db
 from app.models.user import User, SUPER_ADMIN_USERNAME
 from app.models.access_request import AccessRequest
 from app.models.login_log import LoginLog
-from app.schemas.user import UserCreate, UserOut, UserUpdate, UserWithPassword, AccessRequestOut, TransferSuperAdmin
+from app.schemas.user import UserCreate, UserOut, UserUpdate, UserWithPassword, AccessRequestOut, TransferSuperAdmin, SubAdminCreate, SubAdminUpdate
 from app.schemas.login_log import LoginLogOut
-from app.core.deps import get_current_admin, get_current_super_admin
+from app.core.deps import get_current_admin, get_current_super_admin, get_current_full_admin
 from app.core.security import get_password_hash
 
 router = APIRouter()
 
 
 @router.get("/users", response_model=List[UserOut])
-def list_users(db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+def list_users(db: Session = Depends(get_db), admin: User = Depends(get_current_full_admin)):
     return db.query(User).order_by(User.created_at.desc()).all()
 
 
@@ -28,7 +28,7 @@ def list_users_with_passwords(
 
 
 @router.post("/users", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-def create_user(data: UserCreate, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+def create_user(data: UserCreate, db: Session = Depends(get_db), admin: User = Depends(get_current_full_admin)):
     existing = db.query(User).filter(User.username == data.username).first()
     if existing:
         raise HTTPException(status_code=400, detail="Username already taken")
@@ -51,7 +51,7 @@ def update_user(
     user_id: int,
     data: UserUpdate,
     db: Session = Depends(get_db),
-    admin: User = Depends(get_current_admin)
+    admin: User = Depends(get_current_full_admin)
 ):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -87,18 +87,81 @@ def reset_user_password(
 def delete_user(
     user_id: int,
     db: Session = Depends(get_db),
-    admin: User = Depends(get_current_admin)
+    admin: User = Depends(get_current_full_admin)
 ):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    # Nobody can delete the super admin account itself
     if user.is_super_admin:
         raise HTTPException(status_code=403, detail="Cannot delete the super admin account.")
-    # Regular admins cannot delete other admins - only super admin can
     if user.is_admin and not admin.is_super_admin:
         raise HTTPException(status_code=403, detail="Only the super admin can delete admin accounts.")
     db.delete(user)
+    db.commit()
+
+
+# ── SUB-ADMIN ENDPOINTS ───────────────────────────────────────────────────────
+
+@router.get("/sub-admins", response_model=List[UserOut])
+def list_sub_admins(db: Session = Depends(get_db), admin: User = Depends(get_current_full_admin)):
+    return db.query(User).filter(User.is_sub_admin == True).order_by(User.created_at.desc()).all()
+
+
+@router.post("/sub-admins", response_model=UserOut)
+def promote_to_sub_admin(
+    data: SubAdminCreate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_super_admin)
+):
+    """Super admin only: promote a user to sub-admin with specific permissions."""
+    user = db.query(User).filter(User.id == data.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.is_super_admin:
+        raise HTTPException(status_code=400, detail="Cannot demote super admin to sub-admin")
+    user.is_sub_admin = True
+    user.can_manage_users = data.can_manage_users
+    user.can_manage_bots = data.can_manage_bots
+    user.can_manage_youtube = data.can_manage_youtube
+    user.can_view_logs = data.can_view_logs
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.patch("/sub-admins/{user_id}", response_model=UserOut)
+def update_sub_admin_permissions(
+    user_id: int,
+    data: SubAdminUpdate,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_super_admin)
+):
+    """Super admin only: update sub-admin permissions."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or not user.is_sub_admin:
+        raise HTTPException(status_code=404, detail="Sub-admin not found")
+    for key, value in data.model_dump(exclude_unset=True).items():
+        setattr(user, key, value)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.delete("/sub-admins/{user_id}", status_code=204)
+def demote_sub_admin(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_super_admin)
+):
+    """Super admin only: remove sub-admin role."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.is_sub_admin = False
+    user.can_manage_users = False
+    user.can_manage_bots = False
+    user.can_manage_youtube = False
+    user.can_view_logs = False
     db.commit()
 
 
@@ -125,7 +188,7 @@ def transfer_super_admin(
 @router.get("/login-logs", response_model=List[LoginLogOut])
 def get_login_logs(
     db: Session = Depends(get_db),
-    admin: User = Depends(get_current_admin)
+    admin: User = Depends(get_current_full_admin)
 ):
     logs = db.query(LoginLog).order_by(LoginLog.logged_in_at.desc()).limit(200).all()
     result = []
@@ -145,7 +208,7 @@ def get_login_logs(
 # Access Requests
 
 @router.get("/access-requests", response_model=List[AccessRequestOut])
-def list_access_requests(db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+def list_access_requests(db: Session = Depends(get_db), admin: User = Depends(get_current_full_admin)):
     return db.query(AccessRequest).order_by(AccessRequest.created_at.desc()).all()
 
 
@@ -155,7 +218,7 @@ def approve_request(
     can_access_bots: bool = False,
     can_access_youtube: bool = False,
     db: Session = Depends(get_db),
-    admin: User = Depends(get_current_admin)
+    admin: User = Depends(get_current_full_admin)
 ):
     req = db.query(AccessRequest).filter(AccessRequest.id == req_id).first()
     if not req:
@@ -182,7 +245,7 @@ def approve_request(
 
 
 @router.post("/access-requests/{req_id}/reject", status_code=status.HTTP_204_NO_CONTENT)
-def reject_request(req_id: int, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+def reject_request(req_id: int, db: Session = Depends(get_db), admin: User = Depends(get_current_full_admin)):
     req = db.query(AccessRequest).filter(AccessRequest.id == req_id).first()
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")

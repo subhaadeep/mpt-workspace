@@ -22,6 +22,21 @@ class UserUpdate(BaseModel):
     is_admin: Optional[bool] = None
 
 
+class SubAdminCreate(BaseModel):
+    user_id: int
+    can_manage_users: bool = False
+    can_manage_bots: bool = False
+    can_manage_youtube: bool = False
+    can_view_logs: bool = False
+
+
+class SubAdminUpdate(BaseModel):
+    can_manage_users: Optional[bool] = None
+    can_manage_bots: Optional[bool] = None
+    can_manage_youtube: Optional[bool] = None
+    can_view_logs: Optional[bool] = None
+
+
 class TransferSuperAdmin(BaseModel):
     new_super_admin_id: int
 
@@ -31,6 +46,11 @@ class UserOut(UserBase):
     is_active: bool
     is_admin: bool
     is_super_admin: bool
+    is_sub_admin: bool = False
+    can_manage_users: bool = False
+    can_manage_bots: bool = False
+    can_manage_youtube: bool = False
+    can_view_logs: bool = False
     created_at: datetime
 
     class Config:

@@ -29,8 +29,16 @@ def get_current_user(
 
 
 def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
-    if not current_user.is_admin:
+    """Allows full admins, super admins, AND sub-admins (limited access checked per endpoint)."""
+    if not current_user.is_admin and not current_user.is_super_admin and not current_user.is_sub_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+    return current_user
+
+
+def get_current_full_admin(current_user: User = Depends(get_current_user)) -> User:
+    """Requires full admin or super admin (NOT sub-admin)."""
+    if not current_user.is_admin and not current_user.is_super_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Full admin access required")
     return current_user
 
 
@@ -40,13 +48,20 @@ def get_current_super_admin(current_user: User = Depends(get_current_user)) -> U
     return current_user
 
 
+def get_current_sub_admin(current_user: User = Depends(get_current_user)) -> User:
+    """Allows sub-admins, full admins, and super admins."""
+    if not current_user.is_sub_admin and not current_user.is_admin and not current_user.is_super_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sub-admin access required")
+    return current_user
+
+
 def require_bot_access(current_user: User = Depends(get_current_user)) -> User:
-    if not current_user.is_admin and not current_user.can_access_bots:
+    if not current_user.is_admin and not current_user.is_super_admin and not current_user.can_access_bots and not current_user.can_manage_bots:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bot module access denied")
     return current_user
 
 
 def require_youtube_access(current_user: User = Depends(get_current_user)) -> User:
-    if not current_user.is_admin and not current_user.can_access_youtube:
+    if not current_user.is_admin and not current_user.is_super_admin and not current_user.can_access_youtube and not current_user.can_manage_youtube:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="YouTube module access denied")
     return current_user

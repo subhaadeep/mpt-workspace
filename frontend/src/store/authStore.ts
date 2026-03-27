@@ -10,6 +10,11 @@ export type User = {
   full_name?: string
   is_admin: boolean
   is_super_admin: boolean
+  is_sub_admin: boolean
+  can_manage_users: boolean
+  can_manage_bots: boolean
+  can_manage_youtube: boolean
+  can_view_logs: boolean
   can_access_bots: boolean
   can_access_youtube: boolean
   is_active: boolean
