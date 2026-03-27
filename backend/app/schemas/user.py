@@ -43,15 +43,16 @@ class TransferSuperAdmin(BaseModel):
 
 class UserOut(UserBase):
     id: int
-    is_active: bool
-    is_admin: bool
-    is_super_admin: bool
+    is_active: bool = True
+    is_admin: bool = False
+    is_super_admin: bool = False
     is_sub_admin: bool = False
     can_manage_users: bool = False
     can_manage_bots: bool = False
     can_manage_youtube: bool = False
     can_view_logs: bool = False
-    created_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -72,7 +73,7 @@ class AccessRequestOut(BaseModel):
     username: str
     full_name: str
     status: str
-    created_at: datetime
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
