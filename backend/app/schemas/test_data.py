@@ -1,21 +1,19 @@
 from pydantic import BaseModel
-from typing import Optional, Any
+from typing import Optional, Dict, Any
 from datetime import datetime
-from app.models.test_data import TestType
 
 
 class TestDataCreate(BaseModel):
-    test_type: TestType = TestType.backtest
     test_name: Optional[str] = None
-    results: Optional[Any] = None
-    logs: Optional[str] = None
+    result: Optional[str] = None
+    metrics: Optional[Dict[str, Any]] = None
     notes: Optional[str] = None
 
 
 class TestDataOut(TestDataCreate):
     id: int
-    version_id: int
-    created_at: datetime
+    version_id: Optional[int] = None
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

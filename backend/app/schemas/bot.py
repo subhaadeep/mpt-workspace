@@ -34,18 +34,18 @@ class BotUpdate(BaseModel):
 class BotOut(BaseModel):
     id: int
     name: str
-    description: Optional[str]
-    tags: Optional[str]
-    priority: int
-    status: str
+    description: Optional[str] = None
+    tags: Optional[str] = None
+    priority: int = 0
+    status: str = "active"
     account_type: Optional[str] = None
     account_broker: Optional[str] = None
     broker_server: Optional[str] = None
     account_id: Optional[str] = None
     account_password: Optional[str] = None
     account_balance: Optional[str] = None
-    created_by: int
-    created_at: datetime
-    updated_at: Optional[datetime]
+    created_by: Optional[int] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}

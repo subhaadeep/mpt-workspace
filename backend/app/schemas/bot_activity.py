@@ -1,6 +1,7 @@
 from pydantic import BaseModel
-from datetime import datetime
 from typing import Optional
+from datetime import datetime
+
 
 class BotActivityOut(BaseModel):
     id: int
@@ -10,7 +11,6 @@ class BotActivityOut(BaseModel):
     detail: Optional[str] = None
     done_by_id: Optional[int] = None
     done_by_name: Optional[str] = None
-    created_at: datetime
+    created_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}

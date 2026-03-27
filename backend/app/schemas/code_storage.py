@@ -1,29 +1,27 @@
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
-from app.models.code_storage import CodeLanguage
 
 
 class CodeCreate(BaseModel):
-    language: CodeLanguage = CodeLanguage.python
-    filename: Optional[str] = None
-    code_content: Optional[str] = None
-    description: Optional[str] = None
+    label: Optional[str] = None
+    language: Optional[str] = None
+    code: Optional[str] = None
 
 
 class CodeUpdate(BaseModel):
-    language: Optional[CodeLanguage] = None
-    filename: Optional[str] = None
-    code_content: Optional[str] = None
-    description: Optional[str] = None
+    label: Optional[str] = None
+    language: Optional[str] = None
+    code: Optional[str] = None
 
 
-class CodeOut(CodeCreate):
+class CodeOut(BaseModel):
     id: int
-    version_id: int
-    file_path: Optional[str]
-    created_at: datetime
-    updated_at: Optional[datetime]
+    version_id: Optional[int] = None
+    label: Optional[str] = None
+    language: Optional[str] = None
+    code: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}

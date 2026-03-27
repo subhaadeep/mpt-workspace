@@ -13,8 +13,8 @@ class PerformanceCreate(BaseModel):
 
 class PerformanceOut(PerformanceCreate):
     id: int
-    version_id: int
-    updated_at: Optional[datetime]
+    version_id: Optional[int] = None
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
