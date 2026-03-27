@@ -4,23 +4,26 @@ from datetime import datetime
 
 
 class CodeCreate(BaseModel):
-    label: Optional[str] = None
     language: Optional[str] = None
-    code: Optional[str] = None
+    filename: Optional[str] = None
+    code_content: Optional[str] = None
+    description: Optional[str] = None
 
 
 class CodeUpdate(BaseModel):
-    label: Optional[str] = None
     language: Optional[str] = None
-    code: Optional[str] = None
+    filename: Optional[str] = None
+    code_content: Optional[str] = None
+    description: Optional[str] = None
 
 
 class CodeOut(BaseModel):
     id: int
     version_id: Optional[int] = None
-    label: Optional[str] = None
     language: Optional[str] = None
-    code: Optional[str] = None
+    filename: Optional[str] = None
+    code_content: Optional[str] = None
+    description: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
