@@ -1,0 +1,8 @@
+MetaTrader5
+pandas
+numpy
+ta
+requests
+vaderSentiment
+textblob
+python-dotenv
